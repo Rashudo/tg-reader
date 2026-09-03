@@ -116,7 +116,7 @@ npm test
    сообщить уже не может:
 
    ```
-   */5 * * * * /usr/bin/node src/healthcheck.js >> /var/log/tg-reader-health.log 2>&1
+   */5 * * * * /usr/bin/node /путь/к/tg-reader/src/healthcheck.js >> /var/log/tg-reader-health.log 2>&1
    ```
 
 Без `ALERT_BOT_TOKEN` всё работает как раньше, тревоги идут только в журнал.
