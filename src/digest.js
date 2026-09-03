@@ -38,6 +38,8 @@ async function runDigest({
 }) {
   const parts = [];
 
+  if (!dryRun) state.setDigestRunAt(now);
+
   for (const source of sources) {
     const key = peerKeyOf(source);
     const upTo = state.digestUpTo(key);
@@ -72,7 +74,6 @@ async function runDigest({
         await client.sendMessage(target, { message, parseMode: false });
       }
       state.setDigestUpTo(key, items[items.length - 1].id);
-      state.setDigestRunAt(now);
       log(`Сводка отправлена: ${items.length} сообщений, ${messages.length} частей`);
     } catch (err) {
       log(`Сводку собрать не удалось: ${err.message}`);
