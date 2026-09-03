@@ -1,0 +1,18 @@
+{
+  "name": "tg-reader",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Читает сообщения публичного Telegram-канала от имени вашего аккаунта и пересылает вам те, что совпали с массивом ключевых слов",
+  "main": "src/index.js",
+  "scripts": {
+    "login": "node src/login.js",
+    "start": "node src/index.js",
+    "scan": "node src/scan.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "input": "^1.0.1",
+    "telegram": "^2.26.22"
+  },
+  "engines": { "node": ">=18" }
+}

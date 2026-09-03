@@ -1,0 +1,16 @@
+[Unit]
+Description=tg-reader — пересылка сообщений канала по ключевым словам
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/var/www/www-root/data/www/tg-reader
+ExecStart=/usr/bin/node src/index.js
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
