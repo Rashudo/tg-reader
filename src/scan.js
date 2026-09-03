@@ -1,11 +1,11 @@
 const { config } = require('./config');
 const { createClient } = require('./client');
 const { checkReady } = require('./preflight');
-const { prepare, findMatches } = require('./matcher');
+const { prepare, findHits, describeHits, summary } = require('./matcher');
 const keywords = require('../keywords');
 
 const DEFAULT_LIMIT = 100;
-const KEYWORDS = prepare(keywords);
+const KEYWORDS = prepare(keywords, config.disabledGroups);
 
 function parseLimit(raw) {
   if (raw === undefined) return DEFAULT_LIMIT;
@@ -20,6 +20,7 @@ function parseLimit(raw) {
 (async () => {
   checkReady(KEYWORDS.length);
   const limit = parseLimit(process.argv[2]);
+  console.log(summary(keywords, KEYWORDS));
 
   const client = createClient();
   if (client.setLogLevel) client.setLogLevel('error');
@@ -41,17 +42,23 @@ function parseLimit(raw) {
 
     const messages = await client.getMessages(entity, { limit });
     let found = 0;
+    const byGroup = new Map();
 
     for (const msg of messages) {
-      const hits = findMatches(msg.message || '', KEYWORDS);
+      const hits = findHits(msg.message || '', KEYWORDS);
       if (hits.length === 0) continue;
       found += 1;
+      for (const hit of hits) {
+        const key = hit.group || 'без группы';
+        byGroup.set(key, (byGroup.get(key) || 0) + 1);
+      }
       const link = entity.username ? `https://t.me/${entity.username}/${msg.id}` : `#${msg.id}`;
       const preview = (msg.message || '').replace(/\s+/g, ' ').slice(0, 120);
-      console.log(`[${hits.join(', ')}] ${link}\n    ${preview}\n`);
+      console.log(`[${describeHits(hits)}] ${link}\n    ${preview}\n`);
     }
 
     console.log(`${entity.title || ref}: ${found} совпадений из ${messages.length} сообщений`);
+    for (const [group, count] of byGroup) console.log(`    ${group}: ${count}`);
   }
 
   await client.disconnect();

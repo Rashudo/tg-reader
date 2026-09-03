@@ -3,7 +3,7 @@ const { EditedMessage } = require('telegram/events/EditedMessage');
 const { config } = require('./config');
 const { createClient } = require('./client');
 const { checkReady } = require('./preflight');
-const { prepare, findMatches } = require('./matcher');
+const { prepare, findHits, describeHits, summary, unknownGroups } = require('./matcher');
 const { peerKey, eventPeerKey } = require('./peer');
 const { cut, messageLink } = require('./format');
 const { createState } = require('./state');
@@ -12,7 +12,7 @@ const { createWatchdog, createStallWatchdog } = require('./watchdog');
 const { createNotifier } = require('./notify');
 const keywords = require('../keywords');
 
-const KEYWORDS = prepare(keywords);
+const KEYWORDS = prepare(keywords, config.disabledGroups);
 
 const CONNECT_TIMEOUT_MS = 60 * 1000;
 const OFFLINE_LIMIT_MS = 5 * 60 * 1000;
@@ -46,7 +46,7 @@ async function handle(source, messages) {
 
   state.noteSeen(chatKey, messages.length, Date.now());
 
-  const hits = findMatches(text, KEYWORDS);
+  const hits = findHits(text, KEYWORDS);
   if (hits.length === 0) {
     state.advance(chatKey, newestId);
     return;
@@ -62,29 +62,30 @@ async function handle(source, messages) {
   keys.forEach((key) => inFlight.add(key));
   const markSent = () => ids.forEach((id) => state.markSent(chatKey, id));
   const link = messageLink(source, ids[0]);
+  const what = describeHits(hits);
 
   try {
     try {
       await client.forwardMessages(target, { messages: ids, fromPeer: source });
       markSent();
       state.advance(chatKey, newestId);
-      log(`Переслано [${hits.join(', ')}] ${link}`);
+      log(`Переслано [${what}] ${link}`);
       return;
     } catch (err) {
       log(`Пересылка не удалась (${err.message}), отправляю копию`);
     }
 
     try {
-      const head = `Совпадение: ${hits.join(', ')}\n${source.title || ''} ${link}`.trim();
+      const head = `Совпадение: ${what}\n${source.title || ''} ${link}`.trim();
       await client.sendMessage(target, { message: cut(`${head}\n\n${text}`), parseMode: false });
       markSent();
       state.advance(chatKey, newestId);
-      log(`Отправлена копия [${hits.join(', ')}] ${link}`);
+      log(`Отправлена копия [${what}] ${link}`);
     } catch (err) {
       state.advance(chatKey, newestId);
-      log(`ПОТЕРЯНО [${hits.join(', ')}] ${link} — отправить не удалось: ${err.message}`);
+      log(`ПОТЕРЯНО [${what}] ${link} — отправить не удалось: ${err.message}`);
       await notifier.send(
-        `🟠 tg-reader: совпадение [${hits.join(', ')}] не удалось переслать (${err.message}).\nОригинал: ${link}`
+        `🟠 tg-reader: совпадение [${what}] не удалось переслать (${err.message}).\nОригинал: ${link}`
       );
     }
   } finally {
@@ -177,6 +178,10 @@ function shutdown(code) {
 async function main() {
   checkReady(KEYWORDS.length);
 
+  for (const name of unknownGroups(config.disabledGroups, keywords)) {
+    console.error(`В DISABLED_GROUPS указана неизвестная группа «${name}» — проверьте написание в keywords.js`);
+  }
+
   client = createClient();
   if (client.setLogLevel) client.setLogLevel('error');
 
@@ -209,7 +214,7 @@ async function main() {
     process.exit(1);
   }
   log(`Пересылка в: ${config.target === 'me' ? 'Избранное' : target.title || target.username}`);
-  log(`Ключевых слов: ${KEYWORDS.length}`);
+  log(summary(keywords, KEYWORDS));
 
   state.setStartedAt(startedAt);
 

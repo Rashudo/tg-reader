@@ -6,4 +6,11 @@ function numFromEnv(raw, fallback) {
   return value;
 }
 
-module.exports = { numFromEnv };
+function listFromEnv(raw) {
+  return String(raw === undefined || raw === null ? '' : raw)
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+module.exports = { numFromEnv, listFromEnv };

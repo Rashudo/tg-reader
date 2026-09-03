@@ -53,3 +53,92 @@ test('пустой текст не даёт совпадений', () => {
   assert.deepStrictEqual(find('', ['телевизор']), []);
   assert.deepStrictEqual(findMatches(undefined, prepare([{ word: 'тв' }])), []);
 });
+
+const { groupNames, findHits, describeHits } = require('./matcher');
+
+const GROUPS = [
+  { group: 'Телевизоры', words: ['телевизор', { word: 'lg' }] },
+  { group: 'Клавишные', words: ['пианино', { word: 'casio' }] },
+];
+
+test('со списком групп ловятся слова всех групп', () => {
+  const prepared = prepare(GROUPS);
+  assert.deepStrictEqual(findMatches('продам телевизор', prepared), ['телевизор']);
+  assert.deepStrictEqual(findMatches('продам пианино', prepared), ['пианино']);
+});
+
+test('выключенная группа не ловит ничего, остальные работают', () => {
+  const prepared = prepare(GROUPS, ['Клавишные']);
+  assert.deepStrictEqual(findMatches('продам пианино casio', prepared), []);
+  assert.deepStrictEqual(findMatches('продам телевизор', prepared), ['телевизор']);
+});
+
+test('имя выключаемой группы сравнивается без учёта регистра и пробелов', () => {
+  for (const name of ['клавишные', '  КЛАВИШНЫЕ  ']) {
+    assert.deepStrictEqual(findMatches('пианино', prepare(GROUPS, [name])), [], name);
+  }
+});
+
+test('старый плоский список работает как раньше', () => {
+  const prepared = prepare(['телевизор', { word: 'lg' }]);
+  assert.deepStrictEqual(findMatches('продам телевизор', prepared), ['телевизор']);
+  assert.deepStrictEqual(groupNames(['телевизор']), []);
+});
+
+test('имена групп доступны отдельно — по ним проверяются опечатки в настройке', () => {
+  assert.deepStrictEqual(groupNames(GROUPS), ['Телевизоры', 'Клавишные']);
+});
+
+test('совпадение знает свою группу', () => {
+  const [hit] = findHits('продам пианино', prepare(GROUPS));
+  assert.strictEqual(hit.raw, 'пианино');
+  assert.strictEqual(hit.group, 'Клавишные');
+});
+
+test('совпадения из одной группы перечисляются под одним именем', () => {
+  const hits = findHits('телевизор lg', prepare(GROUPS));
+  assert.strictEqual(describeHits(hits), 'Телевизоры: телевизор, lg');
+});
+
+test('совпадения из разных групп разделяются точкой с запятой', () => {
+  const hits = findHits('телевизор и пианино', prepare(GROUPS));
+  assert.strictEqual(describeHits(hits), 'Телевизоры: телевизор; Клавишные: пианино');
+});
+
+test('без групп описание — просто перечисление слов', () => {
+  const hits = findHits('телевизор', prepare(['телевизор']));
+  assert.strictEqual(describeHits(hits), 'телевизор');
+});
+
+test('пустая группа и группа без слов не роняют разбор', () => {
+  const prepared = prepare([{ group: 'Пустая', words: [] }, { group: 'Кривая' }, ...GROUPS]);
+  assert.deepStrictEqual(findMatches('телевизор', prepared), ['телевизор']);
+});
+
+const { unknownGroups } = require('./matcher');
+
+test('опечатка в имени выключаемой группы находится', () => {
+  assert.deepStrictEqual(unknownGroups(['Клавишнык'], GROUPS), ['Клавишнык']);
+});
+
+test('правильные имена опечаткой не считаются, регистр не важен', () => {
+  assert.deepStrictEqual(unknownGroups(['клавишные', ' Телевизоры'], GROUPS), []);
+});
+
+const { summary } = require('./matcher');
+
+test('сводка показывает, сколько групп работает и какие выключены', () => {
+  assert.strictEqual(
+    summary(GROUPS, prepare(GROUPS)),
+    'Ключевых слов: 4 в 2 из 2 групп, выключено: нет'
+  );
+  assert.strictEqual(
+    summary(GROUPS, prepare(GROUPS, ['Клавишные'])),
+    'Ключевых слов: 2 в 1 из 2 групп, выключено: Клавишные'
+  );
+});
+
+test('для плоского списка сводка без групп', () => {
+  const flat = ['телевизор', { word: 'lg' }];
+  assert.strictEqual(summary(flat, prepare(flat)), 'Ключевых слов: 2');
+});

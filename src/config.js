@@ -1,7 +1,7 @@
 const path = require('path');
 
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
-const { numFromEnv } = require('./env');
+const { numFromEnv, listFromEnv } = require('./env');
 
 function required(name) {
   const value = (process.env[name] || '').trim();
@@ -21,6 +21,7 @@ const config = {
     .map((s) => s.trim())
     .filter(Boolean),
   target: (process.env.TARGET || 'me').trim(),
+  disabledGroups: listFromEnv(process.env.DISABLED_GROUPS),
   alert: {
     token: (process.env.ALERT_BOT_TOKEN || '').trim(),
     chatId: (process.env.ALERT_CHAT_ID || '').trim(),

@@ -25,3 +25,19 @@ test('отрицательные и дробные значения отверг
   assert.strictEqual(numFromEnv('-5', 15), 15);
   assert.strictEqual(numFromEnv('1.5', 15), 15);
 });
+
+const { listFromEnv } = require('./env');
+
+test('список через запятую разбирается, пробелы обрезаются', () => {
+  assert.deepStrictEqual(listFromEnv(' Телевизоры , Клавишные '), ['Телевизоры', 'Клавишные']);
+});
+
+test('пустые элементы и лишние запятые отбрасываются', () => {
+  assert.deepStrictEqual(listFromEnv('А,,Б,'), ['А', 'Б']);
+});
+
+test('незаданная переменная даёт пустой список', () => {
+  assert.deepStrictEqual(listFromEnv(undefined), []);
+  assert.deepStrictEqual(listFromEnv(''), []);
+  assert.deepStrictEqual(listFromEnv('  ,  '), []);
+});
