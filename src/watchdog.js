@@ -28,6 +28,7 @@ function createWatchdog({ isConnected, onGiveUp, log, limitMs, intervalMs, now =
 
 function createStallWatchdog({
   lastMessageAt,
+  probe,
   onReconnect,
   onGiveUp,
   log,
@@ -35,14 +36,32 @@ function createStallWatchdog({
   giveUpAfterMs,
   now = Date.now,
 }) {
+  let confirmedAt = 0;
   let reconnectedFor = null;
   let gaveUpFor = null;
+  let busy = false;
 
-  function tick() {
-    const since = lastMessageAt();
+  async function tick() {
+    if (busy) return false;
+
+    const since = Math.max(lastMessageAt(), confirmedAt);
     const silence = now() - since;
-
     if (silence < reconnectAfterMs) return false;
+
+    if (probe) {
+      busy = true;
+      try {
+        if (!(await probe())) {
+          confirmedAt = now();
+          log(`Из канала нет сообщений ${Math.round(silence / 60000)} мин, но и в самом канале нового нет — это тишина, а не застой`);
+          return false;
+        }
+      } catch (err) {
+        log(`Не удалось проверить канал (${err.message}) — считаю это застоем`);
+      } finally {
+        busy = false;
+      }
+    }
 
     if (silence >= giveUpAfterMs) {
       if (gaveUpFor === since) return false;
@@ -62,7 +81,9 @@ function createStallWatchdog({
   return {
     tick,
     start(intervalMs) {
-      return setInterval(tick, intervalMs);
+      return setInterval(() => {
+        tick().catch((err) => log(`Сторож застоя споткнулся: ${err.message}`));
+      }, intervalMs);
     },
   };
 }

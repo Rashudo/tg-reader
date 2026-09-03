@@ -1,6 +1,6 @@
 const { config } = require('./config');
 const { createClient } = require('./client');
-const { checkReady } = require('./preflight');
+const { readSetup } = require('./preflight');
 const { prepare, findHits, describeHits, summary } = require('./matcher');
 const keywords = require('../keywords');
 
@@ -18,7 +18,11 @@ function parseLimit(raw) {
 }
 
 (async () => {
-  checkReady(KEYWORDS.length);
+  const setup = readSetup(KEYWORDS.length, false);
+  if (setup.error) {
+    console.error(setup.error);
+    process.exit(1);
+  }
   const limit = parseLimit(process.argv[2]);
   console.log(summary(keywords, KEYWORDS));
 

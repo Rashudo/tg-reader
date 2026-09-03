@@ -182,3 +182,22 @@ test('состояния failed и inactive — это «упал»', () => {
     assert.strictEqual(alert.kind, 'dead');
   }
 });
+
+test('когда пересылка выключена, застой не проверяется — сообщениям неоткуда взяться', () => {
+  const s = snapshot({ stateAgeMs: 10 * 60 * 60 * 1000, forwarding: false });
+  assert.strictEqual(decide(s, EMPTY, THRESHOLDS).alert, null);
+});
+
+test('при включённой пересылке застой проверяется как раньше', () => {
+  const s = snapshot({ stateAgeMs: 10 * 60 * 60 * 1000, forwarding: true });
+  assert.strictEqual(decide(s, EMPTY, THRESHOLDS).alert.kind, 'stall');
+});
+
+test('без указания режима поведение прежнее', () => {
+  assert.strictEqual(decide(snapshot({ stateAgeMs: 50 * 60 * 1000 }), EMPTY, THRESHOLDS).alert.kind, 'stall');
+});
+
+test('остановленный сервис важнее выключенной пересылки', () => {
+  const s = snapshot({ serviceActive: false, forwarding: false });
+  assert.strictEqual(decide(s, EMPTY, THRESHOLDS).alert.kind, 'dead');
+});

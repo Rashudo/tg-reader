@@ -38,27 +38,32 @@ async function runDigest({
 }) {
   const parts = [];
 
-  if (!dryRun) state.setDigestRunAt(now);
-
   for (const source of sources) {
     const key = peerKeyOf(source);
+    const title = source.title || source.username || key;
     const upTo = state.digestUpTo(key);
     const since = upTo === null ? now - DAY_MS : null;
+
+    if (!dryRun) state.setDigestRunAt(key, now);
 
     try {
       const fetched = await client.getMessages(source, {
         limit: maxMessages,
         ...(upTo === null ? {} : { minId: upTo }),
       });
+      if (fetched.length >= maxMessages) {
+        log(`Сводка «${title}»: за период вышло больше ${maxMessages} сообщений, беру только свежие`);
+      }
+
       const items = toItems(fetched, source, { since, maxMessages, includeLinks });
       if (items.length === 0) {
-        log(`Сводка «${source.title || source.username}»: за период нечего собирать`);
+        log(`Сводка «${title}»: за период нечего собирать`);
         continue;
       }
 
       const summary = await summarizer.summarize(items);
       const messages = renderDigest(summary, {
-        title: source.title || source.username || 'канал',
+        title,
         total: items.length,
         at: now,
         timeZone,

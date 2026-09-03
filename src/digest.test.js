@@ -13,7 +13,7 @@ function harness({ messages = [], summary = { groups: [], dropped: 0 }, summariz
   const sent = [];
   const alerts = [];
   const asked = [];
-  const store = { upTo: null, runAt: null };
+  const store = { upTo: null, runAt: {} };
   return {
     sent,
     alerts,
@@ -38,7 +38,7 @@ function harness({ messages = [], summary = { groups: [], dropped: 0 }, summariz
       state: {
         digestUpTo: () => store.upTo,
         setDigestUpTo: (key, id) => { store.upTo = id; },
-        setDigestRunAt: (at) => { store.runAt = at; },
+        setDigestRunAt: (key, at) => { store.runAt[key] = at; },
       },
       peerKeyOf: () => '-1001',
       target: 'кому',
@@ -67,7 +67,7 @@ test('позиция двигается только после успешной
   const h = harness({ messages: [msg(10, 'а'), msg(12, 'б')], summary: { groups: [], dropped: 2 } });
   await runDigest(h.deps);
   assert.strictEqual(h.store.upTo, 12);
-  assert.strictEqual(h.store.runAt, NOW);
+  assert.strictEqual(h.store.runAt['-1001'], NOW);
 });
 
 test('ошибка модели не двигает позицию и поднимает тревогу', async () => {
@@ -156,7 +156,7 @@ test('со ссылками они доходят до модели', async () =
 test('суточная попытка отмечается до запроса: сбой не превращается в опрос каждые 10 минут', async () => {
   const h = harness({ messages: [msg(10, 'а')], summarizeFails: true });
   await runDigest(h.deps);
-  assert.strictEqual(h.store.runAt, NOW, 'попытка должна быть отмечена, иначе таймер полезет снова');
+  assert.strictEqual(h.store.runAt['-1001'], NOW, 'попытка должна быть отмечена, иначе таймер полезет снова');
   assert.strictEqual(h.store.upTo, null, 'позиция чтения при этом не двигается — новости не потеряются');
 });
 
@@ -164,17 +164,34 @@ test('обрыв на самом запросе тоже расходует су
   const h = harness();
   h.deps.client.getMessages = async () => { throw new Error('сеть'); };
   await runDigest(h.deps);
-  assert.strictEqual(h.store.runAt, NOW);
+  assert.strictEqual(h.store.runAt['-1001'], NOW);
 });
 
 test('пустой канал не приводит к повторному опросу', async () => {
   const h = harness({ messages: [] });
   await runDigest(h.deps);
-  assert.strictEqual(h.store.runAt, NOW);
+  assert.strictEqual(h.store.runAt['-1001'], NOW);
 });
 
 test('пробный прогон суточную попытку не расходует', async () => {
   const h = harness({ messages: [msg(10, 'а')] });
   await runDigest({ ...h.deps, dryRun: true });
-  assert.strictEqual(h.store.runAt, null);
+  assert.strictEqual(h.store.runAt['-1001'], undefined);
+});
+
+test('суточная отметка ставится по каналу, а не одна на всех', async () => {
+  const second = { id: 2, title: 'Второй', username: 'two' };
+  const h = harness({ messages: [msg(10, 'а')] });
+  h.deps.sources = [SOURCE, second];
+  h.deps.peerKeyOf = (s) => (s === SOURCE ? '-1001' : '-1002');
+  await runDigest(h.deps);
+  assert.deepStrictEqual(Object.keys(h.store.runAt).sort(), ['-1001', '-1002']);
+});
+
+test('упор в потолок сообщений не проходит молча', async () => {
+  const many = Array.from({ length: 3 }, (_, i) => msg(i + 1, `новость ${i}`));
+  const h = harness({ messages: many });
+  const logs = [];
+  await runDigest({ ...h.deps, log: (m) => logs.push(m) });
+  assert.match(logs.join(' '), /больше 3|потолок/i);
 });

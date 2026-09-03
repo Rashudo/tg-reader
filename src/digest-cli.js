@@ -7,12 +7,9 @@ const { renderDigest } = require('./digest-render');
 const { withTimeout } = require('./async');
 const news = require('./news');
 
-const args = process.argv.slice(2);
-const has = (flag) => args.includes(flag);
-const valueOf = (flag) => {
-  const at = args.indexOf(flag);
-  return at === -1 ? null : args[at + 1];
-};
+const { parseDigestArgs } = require('./cli-args');
+
+const args = parseDigestArgs(process.argv.slice(2));
 
 function log(...parts) {
   console.log(new Date().toISOString(), ...parts);
@@ -49,9 +46,13 @@ async function fromFile(file) {
 }
 
 (async () => {
-  const file = valueOf('--from-file');
-  if (file) {
-    await fromFile(file);
+  if (args.error) {
+    console.error(args.error);
+    process.exit(1);
+  }
+
+  if (args.fromFile) {
+    await fromFile(args.fromFile);
     process.exit(0);
   }
 
@@ -86,9 +87,8 @@ async function fromFile(file) {
     log,
   });
 
-  const dryRun = has('--dry-run');
-  const result = await digest(state, { dryRun });
-  if (dryRun) console.log(`\n${result.parts.join('\n\n— — —\n\n')}`);
+  const result = await digest.run(state, { dryRun: args.dryRun });
+  if (args.dryRun) console.log(`\n${result.parts.join('\n\n— — —\n\n')}`);
 
   state.flush();
   await client.disconnect();

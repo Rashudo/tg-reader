@@ -37,6 +37,26 @@ const SCHEMA = {
 };
 
 const DEFAULT_MAX_ITEMS = 20;
+const ATTEMPTS = 3;
+const RETRY_PAUSE_MS = 5000;
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+function worthRetrying(err) {
+  return err.status === 429 || (err.status >= 500 && err.status < 600);
+}
+
+async function withRetries(call, { attempts, pauseMs, log }) {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      return await call();
+    } catch (err) {
+      if (attempt >= attempts || !worthRetrying(err)) throw err;
+      log(`Модель ответила ошибкой (${err.message}), попытка ${attempt + 1} из ${attempts}`);
+      await sleep(pauseMs * attempt);
+    }
+  }
+}
 
 function systemPrompt(maxItems) {
   return [
@@ -108,17 +128,29 @@ function textOf(response) {
   return block ? block.text : '';
 }
 
-function createSummarizer({ model = DEFAULT_MODEL, createMessage, log = console.log, maxItems = DEFAULT_MAX_ITEMS }) {
+function createSummarizer({
+  model = DEFAULT_MODEL,
+  createMessage,
+  log = console.log,
+  maxItems = DEFAULT_MAX_ITEMS,
+  attempts = ATTEMPTS,
+  retryPauseMs = RETRY_PAUSE_MS,
+}) {
   return {
     async summarize(items) {
       if (items.length === 0) return { groups: [], dropped: 0 };
 
-      const response = await createMessage({
+      const request = {
         model,
         max_tokens: MAX_TOKENS,
         system: systemPrompt(maxItems),
         messages: [{ role: 'user', content: buildUserMessage(items) }],
         output_config: { format: { type: 'json_schema', schema: SCHEMA } },
+      };
+      const response = await withRetries(() => createMessage(request), {
+        attempts,
+        pauseMs: retryPauseMs,
+        log,
       });
 
       const usage = response.usage || {};

@@ -42,7 +42,7 @@ function createNewsDigest({ client, sources, target, notify, log, createMessage 
     log,
   });
 
-  return (state, { now = Date.now(), dryRun = false } = {}) =>
+  const run = (state, { now = Date.now(), dryRun = false } = {}) =>
     runDigest({
       client,
       sources,
@@ -58,21 +58,23 @@ function createNewsDigest({ client, sources, target, notify, log, createMessage 
       notify,
       dryRun,
     });
-}
 
-function digestDue(state, now = Date.now()) {
-  return isDue(now, {
-    hour: config.news.hour,
-    timeZone: config.news.timeZone,
-    lastRunAt: state.lastDigestRunAt(),
-  });
+  const due = (state, now = Date.now()) =>
+    sources.some((source) =>
+      isDue(now, {
+        hour: config.news.hour,
+        timeZone: config.news.timeZone,
+        lastRunAt: state.lastDigestRunAt(peerKey(source)),
+      })
+    );
+
+  return { run, due };
 }
 
 module.exports = {
   createNewsDigest,
   createAnthropicCall,
   resolveNewsSources,
-  digestDue,
   isConfigured,
   whyNotConfigured,
 };

@@ -1,14 +1,34 @@
 const { config } = require('./config');
 
-function fail(message) {
-  console.error(message);
-  process.exit(1);
+function checkSetup({ session, channels, keywordsCount, newsConfigured }) {
+  const answer = { error: null, warning: null, forwarding: channels.length > 0, news: newsConfigured };
+
+  if (!session) {
+    answer.error = 'Нет TG_SESSION. Сначала выполните: npm run login';
+    return answer;
+  }
+
+  if (answer.forwarding && keywordsCount === 0) {
+    answer.forwarding = false;
+    const trouble = 'Ни одного включённого ключевого слова: keywords.js пуст или все группы в DISABLED_GROUPS';
+    if (newsConfigured) answer.warning = `${trouble}. Пересылку объявлений пропускаю, сводка новостей работает`;
+    else answer.error = trouble;
+    return answer;
+  }
+
+  if (!answer.forwarding && !newsConfigured) {
+    answer.error = 'Нечего делать: не задан ни CHANNEL для объявлений, ни NEWS_CHANNELS для сводки — см. .env.example';
+  }
+  return answer;
 }
 
-function checkReady(keywordsCount) {
-  if (!config.session) fail('Нет TG_SESSION. Сначала выполните: npm run login');
-  if (config.channels.length === 0) fail('Не задан CHANNEL в .env — см. .env.example');
-  if (keywordsCount === 0) fail('Массив в keywords.js пуст — искать нечего');
+function readSetup(keywordsCount, newsConfigured) {
+  return checkSetup({
+    session: config.session,
+    channels: config.channels,
+    keywordsCount,
+    newsConfigured,
+  });
 }
 
-module.exports = { checkReady, fail };
+module.exports = { checkSetup, readSetup };
