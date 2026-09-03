@@ -26,6 +26,17 @@ const config = {
     token: (process.env.ALERT_BOT_TOKEN || '').trim(),
     chatId: (process.env.ALERT_CHAT_ID || '').trim(),
   },
+  anthropicKey: (process.env.ANTHROPIC_API_KEY || '').trim(),
+  news: {
+    channels: listFromEnv(process.env.NEWS_CHANNELS),
+    target: (process.env.NEWS_TARGET || process.env.TARGET || 'me').trim(),
+    model: (process.env.NEWS_MODEL || 'claude-haiku-4-5').trim(),
+    hour: numFromEnv(process.env.NEWS_HOUR, 7),
+    timeZone: (process.env.NEWS_TZ || 'Europe/Belgrade').trim(),
+    maxMessages: numFromEnv(process.env.NEWS_MAX_MESSAGES, 400),
+    maxItems: numFromEnv(process.env.NEWS_MAX_ITEMS, 20),
+    links: (process.env.NEWS_LINKS || 'off').trim().toLowerCase() === 'on',
+  },
   health: {
     serviceName: (process.env.SERVICE_NAME || 'tg-reader').trim(),
     stallReconnectMin: numFromEnv(process.env.STALL_RECONNECT_MIN, 30),

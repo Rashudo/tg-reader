@@ -9,13 +9,17 @@
     "start": "node src/index.js",
     "scan": "node src/scan.js",
     "health": "node src/healthcheck.js",
+    "digest": "node src/digest-cli.js",
     "alert-setup": "node src/alert-setup.js",
     "test": "node --test src/*.test.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.123.0",
     "dotenv": "^16.4.5",
     "input": "^1.0.1",
     "telegram": "^2.26.22"
   },
-  "engines": { "node": ">=18" }
+  "engines": {
+    "node": ">=18"
+  }
 }

@@ -138,3 +138,35 @@ test('служебная запись не попадает в счётчики 
   assert.strictEqual(restarted.lastMessageAt(), 5000);
   assert.strictEqual(restarted.lastId('_service'), null);
 });
+
+test('позиция сводки хранится отдельно от позиции поиска по словам', () => {
+  const file = tmpFile();
+  const state = createState(file);
+  state.advance('-1001', 500);
+  state.setDigestUpTo('-1001', 480);
+  state.flush();
+
+  const restarted = createState(file);
+  assert.strictEqual(restarted.lastId('-1001'), 500);
+  assert.strictEqual(restarted.digestUpTo('-1001'), 480);
+});
+
+test('позиция сводки только растёт', () => {
+  const state = createState(tmpFile());
+  state.setDigestUpTo('-1001', 480);
+  state.setDigestUpTo('-1001', 100);
+  assert.strictEqual(state.digestUpTo('-1001'), 480);
+});
+
+test('до первой сводки позиции нет', () => {
+  assert.strictEqual(createState(tmpFile()).digestUpTo('-1001'), null);
+});
+
+test('время последней сводки переживает перезапуск', () => {
+  const file = tmpFile();
+  const state = createState(file);
+  assert.strictEqual(state.lastDigestRunAt(), null);
+  state.setDigestRunAt(1788000000000);
+  state.flush();
+  assert.strictEqual(createState(file).lastDigestRunAt(), 1788000000000);
+});
