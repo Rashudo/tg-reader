@@ -1,4 +1,5 @@
 require('dotenv').config();
+const { numFromEnv } = require('./env');
 
 function required(name) {
   const value = (process.env[name] || '').trim();
@@ -18,6 +19,18 @@ const config = {
     .map((s) => s.trim())
     .filter(Boolean),
   target: (process.env.TARGET || 'me').trim(),
+  alert: {
+    token: (process.env.ALERT_BOT_TOKEN || '').trim(),
+    chatId: (process.env.ALERT_CHAT_ID || '').trim(),
+  },
+  health: {
+    serviceName: (process.env.SERVICE_NAME || 'tg-reader').trim(),
+    stallReconnectMin: numFromEnv(process.env.STALL_RECONNECT_MIN, 30),
+    stallGiveUpMin: numFromEnv(process.env.STALL_GIVEUP_MIN, 45),
+    repeatMin: numFromEnv(process.env.ALERT_REPEAT_MIN, 60),
+    digestHour: numFromEnv(process.env.DIGEST_HOUR, 9),
+    flappingRestarts: numFromEnv(process.env.FLAPPING_RESTARTS, 3),
+  },
 };
 
 if (Number.isNaN(config.apiId)) {

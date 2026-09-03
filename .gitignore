@@ -1,3 +1,7 @@
 node_modules/
 .env
 *.session
+state.json
+state.json.tmp
+alert-state.json
+alert-state.json.tmp
