@@ -26,4 +26,45 @@ function createWatchdog({ isConnected, onGiveUp, log, limitMs, intervalMs, now =
   };
 }
 
-module.exports = { createWatchdog };
+function createStallWatchdog({
+  lastMessageAt,
+  onReconnect,
+  onGiveUp,
+  log,
+  reconnectAfterMs,
+  giveUpAfterMs,
+  now = Date.now,
+}) {
+  let reconnectedFor = null;
+  let gaveUpFor = null;
+
+  function tick() {
+    const since = lastMessageAt();
+    const silence = now() - since;
+
+    if (silence < reconnectAfterMs) return false;
+
+    if (silence >= giveUpAfterMs) {
+      if (gaveUpFor === since) return false;
+      gaveUpFor = since;
+      onGiveUp();
+      return true;
+    }
+
+    if (reconnectedFor !== since) {
+      reconnectedFor = since;
+      log(`Из канала нет сообщений ${Math.round(silence / 60000)} мин — переподключаюсь`);
+      onReconnect();
+    }
+    return false;
+  }
+
+  return {
+    tick,
+    start(intervalMs) {
+      return setInterval(tick, intervalMs);
+    },
+  };
+}
+
+module.exports = { createWatchdog, createStallWatchdog };

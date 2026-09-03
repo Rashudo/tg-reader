@@ -8,7 +8,8 @@ const { peerKey, eventPeerKey } = require('./peer');
 const { cut, messageLink } = require('./format');
 const { createState } = require('./state');
 const { withTimeout } = require('./async');
-const { createWatchdog } = require('./watchdog');
+const { createWatchdog, createStallWatchdog } = require('./watchdog');
+const { createNotifier } = require('./notify');
 const keywords = require('../keywords');
 
 const KEYWORDS = prepare(keywords);
@@ -18,9 +19,13 @@ const OFFLINE_LIMIT_MS = 5 * 60 * 1000;
 const WATCHDOG_INTERVAL_MS = 30 * 1000;
 const ALBUM_WINDOW_MS = 800;
 const BACKFILL_LIMIT = 50;
+const STALL_RECONNECT_MS = config.health.stallReconnectMin * 60 * 1000;
+const STALL_GIVEUP_MS = config.health.stallGiveUpMin * 60 * 1000;
 
 const state = createState();
+const notifier = createNotifier({ token: config.alert.token, chatId: config.alert.chatId, log });
 const inFlight = new Set();
+const startedAt = Date.now();
 const albums = new Map();
 const sources = new Map();
 
@@ -38,6 +43,8 @@ async function handle(source, messages) {
     .filter(Boolean)
     .join('\n');
   const newestId = Math.max(...messages.map((msg) => msg.id));
+
+  state.noteSeen(chatKey, messages.length, Date.now());
 
   const hits = findMatches(text, KEYWORDS);
   if (hits.length === 0) {
@@ -76,6 +83,9 @@ async function handle(source, messages) {
     } catch (err) {
       state.advance(chatKey, newestId);
       log(`ПОТЕРЯНО [${hits.join(', ')}] ${link} — отправить не удалось: ${err.message}`);
+      await notifier.send(
+        `🟠 tg-reader: совпадение [${hits.join(', ')}] не удалось переслать (${err.message}).\nОригинал: ${link}`
+      );
     }
   } finally {
     keys.forEach((key) => inFlight.delete(key));
@@ -109,6 +119,15 @@ async function onMessage(event) {
     return;
   }
   await handle(source, [msg]);
+}
+
+async function forceReconnect() {
+  await client.disconnect();
+  await withTimeout(client.connect(), CONNECT_TIMEOUT_MS, 'переподключение не уложилось в минуту');
+  log('Переподключился, догружаю пропущенное');
+  for (const source of sources.values()) {
+    await backfill(source).catch((err) => log(`Догрузка после переподключения не удалась: ${err.message}`));
+  }
 }
 
 async function backfill(source) {
@@ -192,6 +211,8 @@ async function main() {
   log(`Пересылка в: ${config.target === 'me' ? 'Избранное' : target.title || target.username}`);
   log(`Ключевых слов: ${KEYWORDS.length}`);
 
+  state.setStartedAt(startedAt);
+
   process.on('SIGINT', () => shutdown(0));
   process.on('SIGTERM', () => shutdown(0));
 
@@ -209,16 +230,32 @@ async function main() {
 
   createWatchdog({
     isConnected: () => Boolean(client.connected),
-    onGiveUp: () => {
-      console.error(
-        `Нет связи с Telegram дольше ${OFFLINE_LIMIT_MS / 60000} мин — выхожу, чтобы systemd перезапустил сервис`
-      );
+    onGiveUp: async () => {
+      const text = `Нет связи с Telegram дольше ${OFFLINE_LIMIT_MS / 60000} мин — выхожу, чтобы systemd перезапустил сервис`;
+      console.error(text);
+      await notifier.send(`🔴 tg-reader: ${text}`);
       shutdown(1);
     },
     log,
     limitMs: OFFLINE_LIMIT_MS,
     intervalMs: WATCHDOG_INTERVAL_MS,
   }).start();
+
+  createStallWatchdog({
+    lastMessageAt: () => Math.max(state.lastMessageAt() || 0, startedAt),
+    onReconnect: () => {
+      forceReconnect().catch((err) => log(`Переподключение не удалось: ${err.message}`));
+    },
+    onGiveUp: async () => {
+      const text = `Из канала нет сообщений ${STALL_GIVEUP_MS / 60000} мин, переподключение не помогло — выхожу на перезапуск`;
+      console.error(text);
+      await notifier.send(`🟠 tg-reader: ${text}`);
+      shutdown(1);
+    },
+    log,
+    reconnectAfterMs: STALL_RECONNECT_MS,
+    giveUpAfterMs: STALL_GIVEUP_MS,
+  }).start(WATCHDOG_INTERVAL_MS);
 
   log('Слушаю новые сообщения. Ctrl+C для остановки.');
 }

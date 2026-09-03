@@ -4,6 +4,7 @@ const path = require('path');
 const STATE_PATH = process.env.TG_STATE_PATH || path.join(__dirname, '..', 'state.json');
 const FLUSH_DELAY_MS = 2000;
 const SENT_MEMORY = 300;
+const SERVICE_KEY = '_service';
 
 function read(file) {
   try {
@@ -18,22 +19,33 @@ function read(file) {
 }
 
 function normalizeEntry(value) {
-  if (Number.isInteger(value)) return { lastId: value, sent: [] };
-  if (!value || typeof value !== 'object') return { lastId: null, sent: [] };
+  const empty = { lastId: null, sent: [], lastMessageAt: null, checked: 0, forwarded: 0 };
+  if (Number.isInteger(value)) return { ...empty, lastId: value };
+  if (!value || typeof value !== 'object') return empty;
   return {
     lastId: Number.isInteger(value.lastId) ? value.lastId : null,
     sent: Array.isArray(value.sent) ? value.sent.filter(Number.isInteger) : [],
+    lastMessageAt: Number.isInteger(value.lastMessageAt) ? value.lastMessageAt : null,
+    checked: Number.isInteger(value.checked) ? value.checked : 0,
+    forwarded: Number.isInteger(value.forwarded) ? value.forwarded : 0,
   };
 }
 
 function createState(file = STATE_PATH) {
   const raw = read(file);
   const data = new Map();
-  for (const [key, value] of Object.entries(raw)) data.set(key, normalizeEntry(value));
+  let service = {};
+  for (const [key, value] of Object.entries(raw)) {
+    if (key === SERVICE_KEY) {
+      service = value && typeof value === 'object' ? value : {};
+      continue;
+    }
+    data.set(key, normalizeEntry(value));
+  }
   let timer = null;
 
   function entry(key) {
-    if (!data.has(key)) data.set(key, { lastId: null, sent: [] });
+    if (!data.has(key)) data.set(key, normalizeEntry(null));
     return data.get(key);
   }
 
@@ -48,7 +60,8 @@ function createState(file = STATE_PATH) {
     }
     try {
       const tmp = `${file}.tmp`;
-      fs.writeFileSync(tmp, JSON.stringify(Object.fromEntries(data), null, 2));
+      const dump = { ...Object.fromEntries(data), [SERVICE_KEY]: service };
+      fs.writeFileSync(tmp, JSON.stringify(dump, null, 2));
       fs.renameSync(tmp, file);
     } catch (err) {
       console.error(`Не удалось сохранить ${file}: ${err.message}`);
@@ -69,11 +82,45 @@ function createState(file = STATE_PATH) {
     wasSent(key, messageId) {
       return entry(key).sent.includes(messageId);
     },
+    startedAt() {
+      return Number.isInteger(service.startedAt) ? service.startedAt : null;
+    },
+    setStartedAt(at) {
+      service = { ...service, startedAt: at };
+      schedule();
+    },
+    noteSeen(key, count, at) {
+      const current = entry(key);
+      current.checked += count;
+      if (Number.isInteger(at) && (current.lastMessageAt === null || at > current.lastMessageAt)) {
+        current.lastMessageAt = at;
+      }
+      schedule();
+    },
+    lastMessageAt() {
+      let newest = null;
+      for (const current of data.values()) {
+        if (current.lastMessageAt !== null && (newest === null || current.lastMessageAt > newest)) {
+          newest = current.lastMessageAt;
+        }
+      }
+      return newest;
+    },
+    totals() {
+      let checked = 0;
+      let forwarded = 0;
+      for (const current of data.values()) {
+        checked += current.checked;
+        forwarded += current.forwarded;
+      }
+      return { checked, forwarded };
+    },
     markSent(key, messageId) {
       if (!Number.isInteger(messageId)) return;
       const current = entry(key);
       if (current.sent.includes(messageId)) return;
       current.sent.push(messageId);
+      current.forwarded += 1;
       if (current.sent.length > SENT_MEMORY) current.sent.splice(0, current.sent.length - SENT_MEMORY);
       schedule();
     },

@@ -8,6 +8,8 @@
     "login": "node src/login.js",
     "start": "node src/index.js",
     "scan": "node src/scan.js",
+    "health": "node src/healthcheck.js",
+    "alert-setup": "node src/alert-setup.js",
     "test": "node --test src/*.test.js"
   },
   "dependencies": {

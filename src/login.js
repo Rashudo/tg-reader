@@ -1,20 +1,12 @@
-const fs = require('fs');
 const path = require('path');
 const input = require('input');
+const { setEnvVar } = require('./envfile');
 const { createClient } = require('./client');
 
 const ENV_PATH = path.join(__dirname, '..', '.env');
 
 function saveSession(session) {
-  let content = fs.existsSync(ENV_PATH) ? fs.readFileSync(ENV_PATH, 'utf8') : '';
-  const line = `TG_SESSION=${session}`;
-  if (/^TG_SESSION=.*$/m.test(content)) {
-    content = content.replace(/^TG_SESSION=.*$/m, () => line);
-  } else {
-    content += (content.endsWith('\n') || content === '' ? '' : '\n') + line + '\n';
-  }
-  fs.writeFileSync(ENV_PATH, content, { mode: 0o600 });
-  fs.chmodSync(ENV_PATH, 0o600);
+  setEnvVar(ENV_PATH, 'TG_SESSION', session);
 }
 
 (async () => {
