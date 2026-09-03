@@ -10,6 +10,7 @@ const { createState } = require('./state');
 const { withTimeout } = require('./async');
 const { createWatchdog, createStallWatchdog } = require('./watchdog');
 const { createNotifier } = require('./notify');
+const news = require('./news');
 const keywords = require('../keywords');
 
 const KEYWORDS = prepare(keywords, config.disabledGroups);
@@ -17,6 +18,7 @@ const KEYWORDS = prepare(keywords, config.disabledGroups);
 const CONNECT_TIMEOUT_MS = 60 * 1000;
 const OFFLINE_LIMIT_MS = 5 * 60 * 1000;
 const WATCHDOG_INTERVAL_MS = 30 * 1000;
+const DIGEST_CHECK_INTERVAL_MS = 10 * 60 * 1000;
 const ALBUM_WINDOW_MS = 800;
 const BACKFILL_LIMIT = 50;
 const STALL_RECONNECT_MS = config.health.stallReconnectMin * 60 * 1000;
@@ -175,6 +177,44 @@ function shutdown(code) {
     .finally(() => process.exit(code));
 }
 
+async function startNewsDigest() {
+  if (!news.isConfigured()) {
+    log(`Сводка новостей выключена: ${news.whyNotConfigured()}`);
+    return;
+  }
+
+  const sources = await news.resolveNewsSources(client, log);
+  if (sources.length === 0) {
+    log('Сводка новостей выключена: ни один канал не открылся');
+    return;
+  }
+
+  const target = await client.getEntity(config.news.target);
+  const digest = news.createNewsDigest({
+    client,
+    sources,
+    target,
+    notify: (text) => notifier.send(text),
+    log,
+  });
+
+  let running = false;
+  setInterval(async () => {
+    if (running || !news.digestDue(state)) return;
+    running = true;
+    try {
+      await digest(state);
+    } catch (err) {
+      log(`Сводка новостей упала: ${err.message}`);
+      await notifier.send(`🟠 tg-reader: сводка новостей упала — ${err.message}`);
+    } finally {
+      running = false;
+    }
+  }, DIGEST_CHECK_INTERVAL_MS);
+
+  log(`Сводка новостей: ${sources.length} канал(ов), в ${config.news.hour}:00 по ${config.news.timeZone}, модель ${config.news.model}`);
+}
+
 async function main() {
   checkReady(KEYWORDS.length);
 
@@ -232,6 +272,8 @@ async function main() {
       log(`Не удалось догрузить пропущенное для ${source.title || source.username}: ${err.message}`);
     }
   }
+
+  await startNewsDigest();
 
   createWatchdog({
     isConnected: () => Boolean(client.connected),

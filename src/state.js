@@ -19,7 +19,7 @@ function read(file) {
 }
 
 function normalizeEntry(value) {
-  const empty = { lastId: null, sent: [], lastMessageAt: null, checked: 0, forwarded: 0 };
+  const empty = { lastId: null, sent: [], lastMessageAt: null, checked: 0, forwarded: 0, digestUpToId: null };
   if (Number.isInteger(value)) return { ...empty, lastId: value };
   if (!value || typeof value !== 'object') return empty;
   return {
@@ -28,6 +28,7 @@ function normalizeEntry(value) {
     lastMessageAt: Number.isInteger(value.lastMessageAt) ? value.lastMessageAt : null,
     checked: Number.isInteger(value.checked) ? value.checked : 0,
     forwarded: Number.isInteger(value.forwarded) ? value.forwarded : 0,
+    digestUpToId: Number.isInteger(value.digestUpToId) ? value.digestUpToId : null,
   };
 }
 
@@ -81,6 +82,23 @@ function createState(file = STATE_PATH) {
     },
     wasSent(key, messageId) {
       return entry(key).sent.includes(messageId);
+    },
+    digestUpTo(key) {
+      return entry(key).digestUpToId;
+    },
+    setDigestUpTo(key, messageId) {
+      if (!Number.isInteger(messageId)) return;
+      const current = entry(key);
+      if (current.digestUpToId !== null && current.digestUpToId >= messageId) return;
+      current.digestUpToId = messageId;
+      schedule();
+    },
+    lastDigestRunAt() {
+      return Number.isInteger(service.lastDigestRunAt) ? service.lastDigestRunAt : null;
+    },
+    setDigestRunAt(at) {
+      service = { ...service, lastDigestRunAt: at };
+      schedule();
     },
     startedAt() {
       return Number.isInteger(service.startedAt) ? service.startedAt : null;
