@@ -1,20 +1,34 @@
 /**
  * Проверка ключевых слов без ожидания новых постов:
  * прогоняет последние N сообщений канала через тот же матчер и печатает совпадения.
- * Ничего не пересылает.
+ * Ничего не пересылает и не двигает позицию чтения.
  *
  *   npm run scan          # последние 100 сообщений
  *   npm run scan -- 500   # последние 500
  */
 const { config } = require('./config');
 const { createClient } = require('./client');
+const { checkReady } = require('./preflight');
 const { prepare, findMatches } = require('./matcher');
 const keywords = require('../keywords');
 
-const LIMIT = Number(process.argv[2]) || 100;
+const DEFAULT_LIMIT = 100;
 const KEYWORDS = prepare(keywords);
 
+function parseLimit(raw) {
+  if (raw === undefined) return DEFAULT_LIMIT;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value <= 0) {
+    console.error(`Некорректное число сообщений "${raw}" — нужно целое больше нуля`);
+    process.exit(1);
+  }
+  return value;
+}
+
 (async () => {
+  checkReady(KEYWORDS.length);
+  const limit = parseLimit(process.argv[2]);
+
   const client = createClient();
   if (client.setLogLevel) client.setLogLevel('error');
   await client.connect();
@@ -25,8 +39,15 @@ const KEYWORDS = prepare(keywords);
   }
 
   for (const ref of config.channels) {
-    const entity = await client.getEntity(ref);
-    const messages = await client.getMessages(entity, { limit: LIMIT });
+    let entity;
+    try {
+      entity = await client.getEntity(ref);
+    } catch (err) {
+      console.error(`Не удалось открыть канал "${ref}": ${err.message}. Вы точно на него подписаны?`);
+      continue;
+    }
+
+    const messages = await client.getMessages(entity, { limit });
     let found = 0;
 
     for (const msg of messages) {
@@ -43,4 +64,7 @@ const KEYWORDS = prepare(keywords);
 
   await client.disconnect();
   process.exit(0);
-})();
+})().catch((err) => {
+  console.error('Фатальная ошибка:', err);
+  process.exit(1);
+});

@@ -8,7 +8,10 @@ function createClient(sessionString = config.session) {
     config.apiId,
     config.apiHash,
     {
-      connectionRetries: 10,
+      // connectionRetries специально не ограничиваем (по умолчанию Infinity):
+      // исчерпав попытки, GramJS помечает сендер отключённым и больше никогда
+      // не переподключается — процесс остаётся жив и молча ничего не пересылает.
+      // Телефон "не поднимает трубку" неограниченно долго, и это правильно.
       // Telegram иногда просит подождать; до 5 минут ждём сами, а не падаем.
       floodSleepThreshold: 300,
     }

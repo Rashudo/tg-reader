@@ -1,3 +1,5 @@
 node_modules/
 .env
 *.session
+state.json
+state.json.tmp
