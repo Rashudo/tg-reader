@@ -21,10 +21,12 @@ function dueMomentOf(timestamp, hour, timeZone) {
   return Date.UTC(local.year, local.month - 1, local.day, hour) - offset;
 }
 
-function isDue(now, { hour, timeZone, lastRunAt }) {
+function isDue(now, { hour, timeZone, lastRunAt, minIntervalMs = 0 }) {
   const dueAt = dueMomentOf(now, hour, timeZone);
   if (now < dueAt) return false;
-  return !Number.isInteger(lastRunAt) || lastRunAt < dueAt;
+  if (!Number.isInteger(lastRunAt)) return true;
+  if (now - lastRunAt < minIntervalMs) return false;
+  return lastRunAt < dueAt;
 }
 
 module.exports = { isDue, dueMomentOf };

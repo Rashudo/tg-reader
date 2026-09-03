@@ -152,3 +152,29 @@ test('со ссылками они доходят до модели', async () =
   const call = h.asked.find((c) => c.items);
   assert.match(call.items[0].link, /t\.me/);
 });
+
+test('суточная попытка отмечается до запроса: сбой не превращается в опрос каждые 10 минут', async () => {
+  const h = harness({ messages: [msg(10, 'а')], summarizeFails: true });
+  await runDigest(h.deps);
+  assert.strictEqual(h.store.runAt, NOW, 'попытка должна быть отмечена, иначе таймер полезет снова');
+  assert.strictEqual(h.store.upTo, null, 'позиция чтения при этом не двигается — новости не потеряются');
+});
+
+test('обрыв на самом запросе тоже расходует суточную попытку', async () => {
+  const h = harness();
+  h.deps.client.getMessages = async () => { throw new Error('сеть'); };
+  await runDigest(h.deps);
+  assert.strictEqual(h.store.runAt, NOW);
+});
+
+test('пустой канал не приводит к повторному опросу', async () => {
+  const h = harness({ messages: [] });
+  await runDigest(h.deps);
+  assert.strictEqual(h.store.runAt, NOW);
+});
+
+test('пробный прогон суточную попытку не расходует', async () => {
+  const h = harness({ messages: [msg(10, 'а')] });
+  await runDigest({ ...h.deps, dryRun: true });
+  assert.strictEqual(h.store.runAt, null);
+});

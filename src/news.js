@@ -5,6 +5,8 @@ const { runDigest } = require('./digest');
 const { peerKey } = require('./peer');
 const { isDue } = require('./schedule');
 
+const MIN_INTERVAL_MS = 20 * 60 * 60 * 1000;
+
 function createAnthropicCall(apiKey) {
   const client = new Anthropic({ apiKey });
   return (request) => client.messages.create(request);
@@ -65,6 +67,7 @@ function digestDue(state, now = Date.now()) {
     hour: config.news.hour,
     timeZone: config.news.timeZone,
     lastRunAt: state.lastDigestRunAt(),
+    minIntervalMs: MIN_INTERVAL_MS,
   });
 }
 
