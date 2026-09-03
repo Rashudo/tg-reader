@@ -56,6 +56,7 @@ function main() {
     serviceState: status.activeState,
     restarts: status.restarts,
     stateAgeMs: since ? now - since : null,
+    forwarding: state.forwarding(),
     ...state.totals(),
   };
 

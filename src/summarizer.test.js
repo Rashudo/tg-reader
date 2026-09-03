@@ -152,3 +152,49 @@ test('промпт ограничивает длину пункта', () => {
 test('промпт требует ставить важное первым — иначе обрезка режет вслепую', () => {
   assert.match(systemPrompt(20), /порядке важности|важное.*перв/i);
 });
+
+function failing(times, status, then = GOOD) {
+  let left = times;
+  const attempts = [];
+  return {
+    attempts,
+    createMessage: async () => {
+      attempts.push(Date.now());
+      if (left-- > 0) {
+        const err = new Error(`перегрузка (${status})`);
+        err.status = status;
+        throw err;
+      }
+      return { content: [{ type: 'text', text: then }], usage: { input_tokens: 1, output_tokens: 1 } };
+    },
+  };
+}
+
+test('временная ошибка модели переживается повтором', async () => {
+  const t = failing(2, 429);
+  const summarizer = createSummarizer({ createMessage: t.createMessage, log: () => {}, retryPauseMs: 1 });
+  const result = await summarizer.summarize(ITEMS);
+  assert.strictEqual(t.attempts.length, 3);
+  assert.strictEqual(result.groups[0].topic, 'Город');
+});
+
+test('перегрузка сервера тоже повторяется', async () => {
+  const t = failing(1, 503);
+  const summarizer = createSummarizer({ createMessage: t.createMessage, log: () => {}, retryPauseMs: 1 });
+  await summarizer.summarize(ITEMS);
+  assert.strictEqual(t.attempts.length, 2);
+});
+
+test('повторы не бесконечны', async () => {
+  const t = failing(99, 429);
+  const summarizer = createSummarizer({ createMessage: t.createMessage, log: () => {}, retryPauseMs: 1 });
+  await assert.rejects(() => summarizer.summarize(ITEMS), /перегрузка/);
+  assert.strictEqual(t.attempts.length, 3, 'три попытки и хватит');
+});
+
+test('ошибка в запросе не повторяется — повтор её не вылечит', async () => {
+  const t = failing(99, 400);
+  const summarizer = createSummarizer({ createMessage: t.createMessage, log: () => {}, retryPauseMs: 1 });
+  await assert.rejects(() => summarizer.summarize(ITEMS));
+  assert.strictEqual(t.attempts.length, 1);
+});

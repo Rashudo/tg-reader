@@ -165,8 +165,55 @@ test('до первой сводки позиции нет', () => {
 test('время последней сводки переживает перезапуск', () => {
   const file = tmpFile();
   const state = createState(file);
-  assert.strictEqual(state.lastDigestRunAt(), null);
-  state.setDigestRunAt(1788000000000);
+  assert.strictEqual(state.lastDigestRunAt('-1001'), null);
+  state.setDigestRunAt('-1001', 1788000000000);
   state.flush();
-  assert.strictEqual(createState(file).lastDigestRunAt(), 1788000000000);
+  assert.strictEqual(createState(file).lastDigestRunAt('-1001'), 1788000000000);
+});
+
+test('чтение состояния не создаёт записей', () => {
+  const file = tmpFile();
+  const state = createState(file);
+  state.lastId('-1009');
+  state.wasSent('-1009', 5);
+  state.digestUpTo('-1009');
+  state.flush();
+  const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
+  assert.deepStrictEqual(Object.keys(saved).filter((k) => k !== '_service'), []);
+});
+
+test('отметка о суточном прогоне хранится по каналу', () => {
+  const file = tmpFile();
+  const state = createState(file);
+  state.setDigestRunAt('-1001', 1788000000000);
+  state.flush();
+
+  const restarted = createState(file);
+  assert.strictEqual(restarted.lastDigestRunAt('-1001'), 1788000000000);
+  assert.strictEqual(restarted.lastDigestRunAt('-1002'), null, 'второй канал живёт своей жизнью');
+});
+
+test('старая общая отметка читается как отметка любого канала — апгрейд не даёт двойной сводки', () => {
+  const file = tmpFile();
+  fs.writeFileSync(file, JSON.stringify({ _service: { lastDigestRunAt: 1788000000000 } }));
+  const state = createState(file);
+  assert.strictEqual(state.lastDigestRunAt('-1001'), 1788000000000);
+});
+
+test('новая отметка по каналу перекрывает старую общую', () => {
+  const file = tmpFile();
+  fs.writeFileSync(file, JSON.stringify({
+    '-1001': { digestRunAt: 1788009999999 },
+    _service: { lastDigestRunAt: 1788000000000 },
+  }));
+  assert.strictEqual(createState(file).lastDigestRunAt('-1001'), 1788009999999);
+});
+
+test('режим работы сервиса виден снаружи и переживает перезапуск', () => {
+  const file = tmpFile();
+  const state = createState(file);
+  assert.strictEqual(state.forwarding(), true, 'по умолчанию считаем, что пересылка есть');
+  state.setForwarding(false);
+  state.flush();
+  assert.strictEqual(createState(file).forwarding(), false);
 });

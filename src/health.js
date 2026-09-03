@@ -8,6 +8,7 @@ function isRunning(snapshot) {
 function problemOf(snapshot, memory, thresholds) {
   if (!isRunning(snapshot)) return 'dead';
   if (snapshot.restarts - memory.seenRestarts >= thresholds.flappingRestarts) return 'flapping';
+  if (snapshot.forwarding === false) return null;
   if (snapshot.stateAgeMs === null || snapshot.stateAgeMs > thresholds.stallMs) return 'stall';
   return null;
 }

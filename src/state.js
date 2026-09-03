@@ -19,7 +19,15 @@ function read(file) {
 }
 
 function normalizeEntry(value) {
-  const empty = { lastId: null, sent: [], lastMessageAt: null, checked: 0, forwarded: 0, digestUpToId: null };
+  const empty = {
+    lastId: null,
+    sent: [],
+    lastMessageAt: null,
+    checked: 0,
+    forwarded: 0,
+    digestUpToId: null,
+    digestRunAt: null,
+  };
   if (Number.isInteger(value)) return { ...empty, lastId: value };
   if (!value || typeof value !== 'object') return empty;
   return {
@@ -29,6 +37,7 @@ function normalizeEntry(value) {
     checked: Number.isInteger(value.checked) ? value.checked : 0,
     forwarded: Number.isInteger(value.forwarded) ? value.forwarded : 0,
     digestUpToId: Number.isInteger(value.digestUpToId) ? value.digestUpToId : null,
+    digestRunAt: Number.isInteger(value.digestRunAt) ? value.digestRunAt : null,
   };
 }
 
@@ -45,7 +54,13 @@ function createState(file = STATE_PATH) {
   }
   let timer = null;
 
-  function entry(key) {
+  const BLANK = normalizeEntry(null);
+
+  function peek(key) {
+    return data.get(key) || BLANK;
+  }
+
+  function mutable(key) {
     if (!data.has(key)) data.set(key, normalizeEntry(null));
     return data.get(key);
   }
@@ -71,33 +86,43 @@ function createState(file = STATE_PATH) {
 
   return {
     lastId(key) {
-      return entry(key).lastId;
+      return peek(key).lastId;
     },
     advance(key, messageId) {
       if (!Number.isInteger(messageId)) return;
-      const current = entry(key);
+      const current = mutable(key);
       if (current.lastId !== null && current.lastId >= messageId) return;
       current.lastId = messageId;
       schedule();
     },
     wasSent(key, messageId) {
-      return entry(key).sent.includes(messageId);
+      return peek(key).sent.includes(messageId);
     },
     digestUpTo(key) {
-      return entry(key).digestUpToId;
+      return peek(key).digestUpToId;
     },
     setDigestUpTo(key, messageId) {
       if (!Number.isInteger(messageId)) return;
-      const current = entry(key);
+      const current = mutable(key);
       if (current.digestUpToId !== null && current.digestUpToId >= messageId) return;
       current.digestUpToId = messageId;
       schedule();
     },
-    lastDigestRunAt() {
+    lastDigestRunAt(key) {
+      const own = peek(key).digestRunAt;
+      if (Number.isInteger(own)) return own;
       return Number.isInteger(service.lastDigestRunAt) ? service.lastDigestRunAt : null;
     },
-    setDigestRunAt(at) {
-      service = { ...service, lastDigestRunAt: at };
+    setDigestRunAt(key, at) {
+      if (!Number.isInteger(at)) return;
+      mutable(key).digestRunAt = at;
+      schedule();
+    },
+    forwarding() {
+      return service.forwarding !== false;
+    },
+    setForwarding(on) {
+      service = { ...service, forwarding: Boolean(on) };
       schedule();
     },
     startedAt() {
@@ -108,7 +133,7 @@ function createState(file = STATE_PATH) {
       schedule();
     },
     noteSeen(key, count, at) {
-      const current = entry(key);
+      const current = mutable(key);
       current.checked += count;
       if (Number.isInteger(at) && (current.lastMessageAt === null || at > current.lastMessageAt)) {
         current.lastMessageAt = at;
@@ -135,7 +160,7 @@ function createState(file = STATE_PATH) {
     },
     markSent(key, messageId) {
       if (!Number.isInteger(messageId)) return;
-      const current = entry(key);
+      const current = mutable(key);
       if (current.sent.includes(messageId)) return;
       current.sent.push(messageId);
       current.forwarded += 1;
