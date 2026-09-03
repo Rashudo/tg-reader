@@ -1,4 +1,3 @@
-/** Обещание с крайним сроком: висящий вызов должен падать, а не молчать вечно. */
 function withTimeout(promise, ms, message) {
   let timer;
   return Promise.race([

@@ -1,4 +1,3 @@
-/** Проверки, без которых и index.js, и scan.js молча не делают ничего. */
 const { config } = require('./config');
 
 function fail(message) {

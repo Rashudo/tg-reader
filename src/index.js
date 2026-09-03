@@ -1,7 +1,3 @@
-/**
- * Слушает новые сообщения в указанном канале от имени вашего аккаунта
- * и пересылает в TARGET те, что содержат хотя бы одно слово из keywords.js.
- */
 const { NewMessage } = require('telegram/events');
 const { EditedMessage } = require('telegram/events/EditedMessage');
 const { config } = require('./config');
@@ -17,14 +13,10 @@ const keywords = require('../keywords');
 
 const KEYWORDS = prepare(keywords);
 
-/** Не подключились за минуту — выходим, systemd поднимет заново. Молча висеть нельзя. */
 const CONNECT_TIMEOUT_MS = 60 * 1000;
-/** Столько живём без связи, потом тоже выходим: перезапуск догрузит пропущенное. */
 const OFFLINE_LIMIT_MS = 5 * 60 * 1000;
 const WATCHDOG_INTERVAL_MS = 30 * 1000;
-/** Части альбома приходят отдельными апдейтами — ждём соседей, чтобы переслать целиком. */
 const ALBUM_WINDOW_MS = 800;
-/** Сколько сообщений максимум догружаем на канал после простоя. */
 const BACKFILL_LIMIT = 50;
 
 const state = createState();
@@ -39,13 +31,6 @@ function log(...args) {
   console.log(new Date().toISOString(), ...args);
 }
 
-/**
- * Пересылает группу сообщений (обычный пост — группа из одного), если в их тексте
- * есть ключевое слово. Отметка «отправлено» ставится только после успеха: иначе
- * сообщение, упавшее на сетевой ошибке или FLOOD_WAIT, было бы потеряно навсегда
- * — повторный апдейт от Telegram отсёкся бы дедупом. Отметка переживает рестарт,
- * поэтому правка старого поста не приводит к дублю.
- */
 async function handle(source, messages) {
   const chatKey = peerKey(source);
   const text = messages
@@ -79,14 +64,11 @@ async function handle(source, messages) {
       log(`Переслано [${hits.join(', ')}] ${link}`);
       return;
     } catch (err) {
-      // В канале может стоять запрет на пересылку — тогда шлём копию текста со ссылкой.
       log(`Пересылка не удалась (${err.message}), отправляю копию`);
     }
 
     try {
       const head = `Совпадение: ${hits.join(', ')}\n${source.title || ''} ${link}`.trim();
-      // parseMode: false — иначе markdown-парсер GramJS съест ** __ ~~ ` из чужого
-      // текста и «Стоимость 10__000» превратится в «10000».
       await client.sendMessage(target, { message: cut(`${head}\n\n${text}`), parseMode: false });
       markSent();
       state.advance(chatKey, newestId);
@@ -100,7 +82,6 @@ async function handle(source, messages) {
   }
 }
 
-/** Копит части альбома и отдаёт их одной пачкой, когда поток затих. */
 function queueAlbum(source, message) {
   const key = `${peerKey(source)}:g${message.groupedId}`;
   let entry = albums.get(key);
@@ -123,7 +104,6 @@ async function onMessage(event) {
   const source = sources.get(eventPeerKey(event, msg));
   if (!source) return;
 
-  // msg.message — это и текст сообщения, и подпись к медиа.
   if (msg.groupedId) {
     queueAlbum(source, msg);
     return;
@@ -131,11 +111,6 @@ async function onMessage(event) {
   await handle(source, [msg]);
 }
 
-/**
- * Догружает то, что вышло за время простоя. На первом запуске ничего не
- * пересылает — только запоминает точку отсчёта, чтобы не завалить Избранное
- * старыми совпадениями.
- */
 async function backfill(source) {
   const chatKey = peerKey(source);
   const last = state.lastId(chatKey);
@@ -156,7 +131,6 @@ async function backfill(source) {
     log(`${title}: за время простоя вышло больше ${BACKFILL_LIMIT} сообщений, проверяю только последние`);
   }
 
-  // Альбом догружаем целиком, а не по частям — как и в живом режиме.
   const groups = new Map();
   for (const msg of missed) {
     const key = msg.groupedId ? `g${msg.groupedId}` : `m${msg.id}`;
@@ -175,7 +149,6 @@ function shutdown(code) {
   if (shuttingDown) return;
   shuttingDown = true;
   state.flush();
-  // Если disconnect подвиснет на мёртвом сокете — всё равно выходим.
   setTimeout(() => process.exit(code), 3000).unref();
   Promise.resolve(client && client.disconnect())
     .catch(() => {})
@@ -188,8 +161,6 @@ async function main() {
   client = createClient();
   if (client.setLogLevel) client.setLogLevel('error');
 
-  // connect() при недоступной сети не возвращает управление: запрос уходит в
-  // очередь, которую некому разобрать. Без таймаута сервис висел бы вечно.
   await withTimeout(
     client.connect(),
     CONNECT_TIMEOUT_MS,
@@ -201,8 +172,6 @@ async function main() {
     process.exit(1);
   }
 
-  // Резолвим каналы заранее: так сразу видно опечатку в CHANNEL,
-  // и появляется точный список id для фильтра событий.
   for (const ref of config.channels) {
     try {
       const entity = await client.getEntity(ref);
@@ -226,12 +195,8 @@ async function main() {
   process.on('SIGINT', () => shutdown(0));
   process.on('SIGTERM', () => shutdown(0));
 
-  // Подписываемся до догрузки: пост, вышедший прямо сейчас, не должен провалиться
-  // в щель между backfill и подпиской. Повторную отправку снимает state/inFlight.
   const onEvent = (event) => onMessage(event);
   client.addEventHandler(onEvent, new NewMessage({}));
-  // Правка поста — обычное дело в объявлениях («UPD: отдам ещё телевизор»),
-  // а нового сообщения при этом не приходит.
   client.addEventHandler(onEvent, new EditedMessage({}));
 
   for (const source of sources.values()) {

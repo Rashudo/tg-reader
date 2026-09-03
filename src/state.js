@@ -1,20 +1,8 @@
-/**
- * Что уже прочитано и что уже отправлено — по каждому каналу.
- *
- * Позиция чтения нужна, чтобы после рестарта (systemd, правка keywords.js,
- * обрыв связи) не потерять посты, вышедшие за время простоя: GramJS сам
- * пропущенное не догружает — catchUp() в библиотеке пустой.
- *
- * Список отправленных id нужен, чтобы рестарт не привёл к дублю: правка старого
- * поста приходит как отдельное событие, и без памяти о прошлых отправках
- * объявление ушло бы в Избранное второй раз.
- */
 const fs = require('fs');
 const path = require('path');
 
 const STATE_PATH = process.env.TG_STATE_PATH || path.join(__dirname, '..', 'state.json');
 const FLUSH_DELAY_MS = 2000;
-/** Сколько отправленных id помним на канал. Хватает на любой разумный простой. */
 const SENT_MEMORY = 300;
 
 function read(file) {
@@ -29,7 +17,6 @@ function read(file) {
   }
 }
 
-/** Ранняя версия файла хранила просто число — читаем и её. */
 function normalizeEntry(value) {
   if (Number.isInteger(value)) return { lastId: value, sent: [] };
   if (!value || typeof value !== 'object') return { lastId: null, sent: [] };
@@ -60,7 +47,6 @@ function createState(file = STATE_PATH) {
       timer = null;
     }
     try {
-      // Через временный файл: обрыв питания посреди записи не оставит битый JSON.
       const tmp = `${file}.tmp`;
       fs.writeFileSync(tmp, JSON.stringify(Object.fromEntries(data), null, 2));
       fs.renameSync(tmp, file);
@@ -70,11 +56,9 @@ function createState(file = STATE_PATH) {
   }
 
   return {
-    /** id последнего просмотренного сообщения или null, если канал ещё не читали. */
     lastId(key) {
       return entry(key).lastId;
     },
-    /** Позиция только растёт: пришедшее с опозданием старое сообщение её не откатит. */
     advance(key, messageId) {
       if (!Number.isInteger(messageId)) return;
       const current = entry(key);

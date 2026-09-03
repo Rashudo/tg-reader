@@ -1,7 +1,3 @@
-/**
- * Разовый вход в аккаунт. Спросит телефон, код из Telegram и (если есть) пароль 2FA,
- * затем сохранит строку сессии в .env — больше входить не потребуется.
- */
 const fs = require('fs');
 const path = require('path');
 const input = require('input');
@@ -13,16 +9,11 @@ function saveSession(session) {
   let content = fs.existsSync(ENV_PATH) ? fs.readFileSync(ENV_PATH, 'utf8') : '';
   const line = `TG_SESSION=${session}`;
   if (/^TG_SESSION=.*$/m.test(content)) {
-    // Замена функцией, а не строкой: иначе $& и $1 в строке сессии были бы
-    // истолкованы как ссылки на группы совпадения.
     content = content.replace(/^TG_SESSION=.*$/m, () => line);
   } else {
     content += (content.endsWith('\n') || content === '' ? '' : '\n') + line + '\n';
   }
   fs.writeFileSync(ENV_PATH, content, { mode: 0o600 });
-  // mode в writeFileSync действует только при создании файла, а .env к этому
-  // моменту уже существует — иначе строка сессии (это доступ к аккаунту)
-  // осталась бы с правами 644 после обычного `cp .env.example .env`.
   fs.chmodSync(ENV_PATH, 0o600);
 }
 
