@@ -60,25 +60,31 @@ test('неизвестная зона не роняет сервис', () => {
 });
 
 test('второй опрос за сутки не случится, даже если час сводки переставили днём', () => {
-  const ranAtSeven = at('2026-09-03T05:00:00Z');
-  const eightInTheEvening = at('2026-09-03T18:00:00Z');
+  const ranAtSevenLocal = at('2026-09-03T05:00:00Z');
+  const eightInTheEveningLocal = at('2026-09-03T18:00:00Z');
   assert.strictEqual(
-    isDue(eightInTheEvening, { hour: 20, timeZone: BELGRADE, lastRunAt: ranAtSeven, minIntervalMs: 20 * 3600 * 1000 }),
+    isDue(eightInTheEveningLocal, { hour: 20, timeZone: BELGRADE, lastRunAt: ranAtSevenLocal }),
     false,
-    'час поменяли с 7 на 20 — но сутки ещё не прошли'
+    'час поменяли с 7 на 20, но это те же местные сутки'
   );
 });
 
-test('через сутки после прошлого опроса — можно', () => {
-  const ranYesterday = at('2026-09-02T05:00:00Z');
-  const now = at('2026-09-03T05:01:00Z');
+test('ручной вечерний прогон не отменяет завтрашнюю утреннюю сводку', () => {
+  const ranYesterdayEvening = at('2026-09-03T19:32:00Z');
+  const tomorrowMorning = at('2026-09-04T05:01:00Z');
   assert.strictEqual(
-    isDue(now, { hour: 7, timeZone: BELGRADE, lastRunAt: ranYesterday, minIntervalMs: 20 * 3600 * 1000 }),
-    true
+    isDue(tomorrowMorning, { hour: 7, timeZone: BELGRADE, lastRunAt: ranYesterdayEvening }),
+    true,
+    'между ними всего 9,5 часов, но это разные местные сутки — сводка должна прийти'
   );
 });
 
-test('без указания минимального промежутка поведение прежнее', () => {
-  const ranYesterday = at('2026-09-02T05:00:00Z');
-  assert.strictEqual(isDue(at('2026-09-03T05:01:00Z'), { hour: 7, timeZone: BELGRADE, lastRunAt: ranYesterday }), true);
+test('в те же местные сутки второй раз не полезет, даже если прошло много часов', () => {
+  const ranAtOneAmLocal = at('2026-09-03T23:00:00Z');
+  const sameLocalDayEvening = at('2026-09-04T18:00:00Z');
+  assert.strictEqual(
+    isDue(sameLocalDayEvening, { hour: 7, timeZone: BELGRADE, lastRunAt: ranAtOneAmLocal }),
+    false,
+    'оба момента — 4 сентября по Белграду'
+  );
 });

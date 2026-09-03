@@ -21,12 +21,20 @@ function dueMomentOf(timestamp, hour, timeZone) {
   return Date.UTC(local.year, local.month - 1, local.day, hour) - offset;
 }
 
-function isDue(now, { hour, timeZone, lastRunAt, minIntervalMs = 0 }) {
-  const dueAt = dueMomentOf(now, hour, timeZone);
-  if (now < dueAt) return false;
-  if (!Number.isInteger(lastRunAt)) return true;
-  if (now - lastRunAt < minIntervalMs) return false;
-  return lastRunAt < dueAt;
+function localDayOf(timestamp, timeZone) {
+  let local;
+  try {
+    local = zonedParts(timestamp, timeZone);
+  } catch (err) {
+    local = zonedParts(timestamp, 'UTC');
+  }
+  return `${local.year}-${local.month}-${local.day}`;
 }
 
-module.exports = { isDue, dueMomentOf };
+function isDue(now, { hour, timeZone, lastRunAt }) {
+  if (now < dueMomentOf(now, hour, timeZone)) return false;
+  if (!Number.isInteger(lastRunAt)) return true;
+  return localDayOf(lastRunAt, timeZone) !== localDayOf(now, timeZone);
+}
+
+module.exports = { isDue, dueMomentOf, localDayOf };
