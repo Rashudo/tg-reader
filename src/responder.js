@@ -1,7 +1,7 @@
 const { estimateCost } = require('./summarizer');
 
 const DEFAULT_MODEL = 'claude-opus-4-8';
-const MAX_TOKENS = 800;
+const MAX_TOKENS = 1200;
 const DEFAULT_MAX_CHARS = 160;
 
 const SCHEMA = {

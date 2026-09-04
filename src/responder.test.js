@@ -212,7 +212,7 @@ test('на ответ отводится вдвое больше токенов'
     samples: [],
   });
   await responder.compose({ window: WINDOW, trigger: null, mode: 'spontaneous' });
-  assert.strictEqual(seen[0].max_tokens, 800);
+  assert.strictEqual(seen[0].max_tokens, 1200);
 });
 
 test('роль описана как постироничная, а не язвительная', () => {
