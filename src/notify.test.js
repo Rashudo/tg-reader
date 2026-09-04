@@ -69,3 +69,26 @@ test('отказ Bot API виден в логе', async () => {
   assert.strictEqual(await notifier.send('тревога'), false);
   assert.match(logged.join(' '), /chat not found/);
 });
+
+test('кнопки уходят в Bot API как inline-клавиатура', async () => {
+  const calls = [];
+  const notifier = createNotifier({
+    token: 't',
+    chatId: '7',
+    request: async (url, body) => {
+      calls.push({ url, body });
+      return { ok: true };
+    },
+  });
+  await notifier.send('готово', { buttons: [[{ text: 'Больше не отвечать', data: 'replies:off' }]] });
+  assert.deepStrictEqual(calls[0].body.reply_markup, {
+    inline_keyboard: [[{ text: 'Больше не отвечать', callback_data: 'replies:off' }]],
+  });
+});
+
+test('без кнопок клавиатура не отправляется', async () => {
+  const calls = [];
+  const notifier = createNotifier({ token: 't', chatId: '7', request: async (url, body) => { calls.push(body); return { ok: true }; } });
+  await notifier.send('готово');
+  assert.strictEqual(calls[0].reply_markup, undefined);
+});
