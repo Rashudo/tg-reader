@@ -346,3 +346,59 @@ test('слишком старая заготовка выбрасывается,
   assert.strictEqual(replier.pending(), 0);
   assert.ok(logs.some((line) => /устарел/.test(line)));
 });
+
+test('своя отправленная реплика попадает в окно разговора', async () => {
+  const { replier, clock } = rig();
+  await replier.onMessage(MINE);
+  await replier.onMessage(ASK);
+  clock.advance(5 * MIN);
+  await replier.flush();
+  const own = replier.window().find((msg) => msg.id === 901);
+  assert.ok(own, 'отправленная реплика должна быть в окне');
+  assert.strictEqual(own.from, ME);
+  assert.strictEqual(own.text, 'ага');
+});
+
+test('ответ на реплику бота — такое же обращение, как ответ на слова хозяина', async () => {
+  const { replier, sent, clock } = rig();
+  await replier.onMessage(MINE);
+  await replier.onMessage(ASK);
+  clock.advance(5 * MIN);
+  await replier.flush();
+  assert.strictEqual(sent.length, 1);
+  await replier.onMessage({ id: 20, from: 'other', author: 'Женя', replyTo: 901, text: 'да ладно?' });
+  assert.strictEqual(replier.pending(), 1);
+});
+
+test('пришедшее следом событие о своей же реплике не дублирует окно', async () => {
+  const { replier, clock } = rig();
+  await replier.onMessage(MINE);
+  await replier.onMessage(ASK);
+  clock.advance(5 * MIN);
+  await replier.flush();
+  await replier.onMessage({ id: 901, from: ME, author: 'Стас', replyTo: 11, text: 'ага' });
+  assert.strictEqual(replier.window().filter((msg) => msg.id === 901).length, 1);
+});
+
+test('после старта окно наполняется историей, но отвечать по ней не начинает', async () => {
+  const { replier } = rig();
+  replier.seed([
+    { id: 5, from: ME, author: 'Стас', replyTo: null, text: 'я в деле' },
+    { id: 6, from: 'other', author: 'Тимур', replyTo: 5, text: 'ну как?' },
+  ]);
+  assert.strictEqual(replier.window().length, 2);
+  assert.strictEqual(replier.pending(), 0);
+});
+
+test('ответ на сообщение хозяина, сказанное до перезапуска, распознаётся', async () => {
+  const { replier } = rig();
+  replier.seed([{ id: 5, from: ME, author: 'Стас', replyTo: null, text: 'я в деле' }]);
+  await replier.onMessage({ id: 7, from: 'other', author: 'Тимур', replyTo: 5, text: 'а точно?' });
+  assert.strictEqual(replier.pending(), 1);
+});
+
+test('история без текста в окно не идёт', async () => {
+  const { replier } = rig();
+  replier.seed([{ id: 5, from: ME, author: 'Стас', replyTo: null, text: '' }]);
+  assert.strictEqual(replier.window().length, 0);
+});

@@ -261,6 +261,22 @@ async function startReplies() {
     log,
   });
 
+  try {
+    const history = await client.getMessages(chat, { limit: config.replies.context });
+    replier.seed(
+      [...history].reverse().map((msg) => ({
+        id: msg.id,
+        from: msg.senderId ? String(msg.senderId) : null,
+        author: (msg.senderId && names.get(String(msg.senderId))) || 'кто-то',
+        replyTo: msg.replyTo ? msg.replyTo.replyToMsgId : null,
+        text: msg.message || '',
+      }))
+    );
+    log(`Ответчик: подтянул ${replier.window().length} сообщений чата для контекста`);
+  } catch (err) {
+    log(`Ответчик: историю чата подтянуть не удалось (${err.message}) — начинаю с пустого окна`);
+  }
+
   const chatKey = peerKey(chat);
   client.addEventHandler((event) => {
     if (eventPeerKey(event) !== chatKey) return;

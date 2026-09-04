@@ -26,6 +26,7 @@ function createReplier({
   let freshCount = 0;
 
   function remember(msg) {
+    if (byId.has(msg.id)) return;
     window.push(msg);
     byId.set(msg.id, msg);
     while (window.length > limits.context) {
@@ -59,11 +60,21 @@ function createReplier({
       return false;
     }
 
-    await client.sendMessage(chat, {
+    const posted = await client.sendMessage(chat, {
       message: composed.text,
       ...(composed.replyToId ? { replyTo: composed.replyToId } : {}),
       parseMode: false,
     });
+
+    if (posted && Number.isInteger(posted.id)) {
+      remember({
+        id: posted.id,
+        from: String(meId),
+        author: 'ты',
+        replyTo: composed.replyToId || null,
+        text: composed.text,
+      });
+    }
 
     const at = now();
     if (trigger) state.noteAnswered(trigger.id);
@@ -76,6 +87,14 @@ function createReplier({
   return {
     window: () => window,
     pending: () => queue.length,
+
+    seed(messages) {
+      for (const msg of messages) {
+        const text = (msg.text || '').trim();
+        if (!text) continue;
+        remember({ ...msg, text });
+      }
+    },
 
     async onMessage(msg) {
       const text = (msg.text || '').trim();
