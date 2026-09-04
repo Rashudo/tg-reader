@@ -2546,7 +2546,7 @@ const LEGACY_PATH = process.env.TG_STATE_PATH || path.join(__dirname, '..', 'sta
 
 `flush()` пустеет намеренно: батчинг с окном в две секунды существовал ради файла и терял эти две секунды при `kill -9`. Для автоответов это была прямая дорога ко второму ответу на то же сообщение — публично.
 
-**`src/state.test.js` удаляется** (`git rm src/state.test.js`). Он проверял поведение JSON-файла, которого больше нет: `createState(file)` там принимает путь к `.json`, пишет туда и перечитывает. Все восемнадцать его проверок закрыты тестами четырёх store — по одной, без потерь:
+**`src/state.test.js` удаляется** (`git rm src/state.test.js`). Он проверял поведение JSON-файла, которого больше нет: `createState(file)` там принимает путь к `.json`, пишет туда и перечитывает. Все тридцать шесть его проверок закрыты тестами четырёх store:
 
 | было в `state.test.js` | стало |
 |---|---|
@@ -2561,7 +2561,7 @@ const LEGACY_PATH = process.env.TG_STATE_PATH || path.join(__dirname, '..', 'sta
 | курсоры и время прогона сводки | `digest/store.test.js` — три теста |
 | флаг, бюджеты, `answered`, `said`, `botOffset` | `replies/store.test.js` — восемь тестов |
 
-Итог по числу: минус 18 тестов файла, плюс 4 (`open`) + 9 (`import`) + 9 (`forwarding/store`) + 3 (`digest/store`) + 8 (`replies/store`) + 6 (`status`) = 39.
+Итог по числу: минус 36 тестов файла, плюс 4 (`open`) + 10 (`import`) + 10 (`forwarding/store`) + 4 (`digest/store`) + 11 (`replies/store`) + 6 (`status`) = 45.
 
 Run: `cd /root/tg-reader-refactor && npm test 2>&1 | tail -8`
 Expected: `# fail 0`
