@@ -29,22 +29,23 @@ function voiceBlock(samples) {
   return ['', 'Так он пишет на самом деле:', ...samples.map((sample) => `— ${sample}`), ''].join('\n');
 }
 
-function systemPrompt({ samples = [], maxChars = DEFAULT_MAX_CHARS, mode = 'spontaneous' }) {
+function systemPrompt({ samples = [], maxChars = DEFAULT_MAX_CHARS, mode = 'spontaneous', name = 'Стас' }) {
   const task =
     mode === 'addressed'
       ? [
-          'К нему обратились: ответили на его сообщение или назвали по имени.',
-          'Ответь так, как ответил бы он сам.',
+          'К тебе обратились: ответили на твоё сообщение или назвали по имени.',
+          'Ответь сам, своими словами.',
         ]
       : [
-          'К нему никто не обращался. Ты решаешь, есть ли повод вставить одну реплику.',
+          'К тебе никто не обращался. Ты решаешь, есть ли повод вставить одну реплику.',
           'Повод есть редко: три-четыре раза за сутки. Нет повода — молчи, это нормальный исход.',
           'В поле replyToId укажи id сообщения, к которому цепляешь реплику.',
         ];
 
   return [
-    'Ты пишешь сообщения в чат из четырёх друзей за одного из них.',
-    'Он там свой, немного язвительный. Друзья знают его много лет и подделку заметят.',
+    `Ты — ${name}, участник чата из четырёх друзей. Пишешь в этот чат от своего имени.`,
+    'Ты там свой, немного язвительный. Друзья знают тебя много лет и подделку заметят.',
+    'Твои прошлые сообщения в переписке подписаны «ты».',
     '',
     ...task,
     voiceBlock(samples),
@@ -54,6 +55,7 @@ function systemPrompt({ samples = [], maxChars = DEFAULT_MAX_CHARS, mode = 'spon
     '— без вступлений, без «конечно», без извинений, без объяснения шутки;',
     '— не переспрашивай и не предлагай помощь: это чат друзей, а не поддержка;',
     '— эмодзи только такие и настолько же редко, как в образцах;',
+    `— пиши от первого лица; никогда не говори о себе в третьем лице и не называй себя «${name}»;`,
     '— не выдумывай факты о людях: ни планов, ни договорённостей, ни обещаний;',
     '— никакой прямой похабщины про названных по имени людей;',
     '— если сказать нечего или разговор не твой — верни reply: false и промолчи.',
@@ -61,7 +63,7 @@ function systemPrompt({ samples = [], maxChars = DEFAULT_MAX_CHARS, mode = 'spon
 }
 
 function buildUserMessage({ window, trigger }) {
-  const lines = window.map((msg) => `[${msg.id}] ${msg.author}: ${msg.text}`);
+  const lines = window.map((msg) => `[${msg.id}] ${msg.mine ? 'ты' : msg.author}: ${msg.text}`);
   const parts = ['Последние сообщения чата:', ...lines];
   if (trigger) {
     parts.push('', `Обращение к тебе: [${trigger.id}] ${trigger.author}: ${trigger.text}`);
@@ -81,6 +83,7 @@ function createResponder({
   createMessage,
   samples = [],
   maxChars = DEFAULT_MAX_CHARS,
+  name = 'Стас',
   log = console.log,
 }) {
   return {
@@ -88,7 +91,7 @@ function createResponder({
       const response = await createMessage({
         model,
         max_tokens: MAX_TOKENS,
-        system: systemPrompt({ samples, maxChars, mode }),
+        system: systemPrompt({ samples, maxChars, mode, name }),
         messages: [{ role: 'user', content: buildUserMessage({ window, trigger }) }],
         output_config: { format: { type: 'json_schema', schema: SCHEMA } },
       });

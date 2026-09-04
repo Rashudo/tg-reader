@@ -75,6 +75,7 @@ function memoryState() {
       createMessage: createAnthropicCall(config.anthropicKey),
       samples: voice.samples,
       maxChars: config.replies.maxChars,
+      name: 'Стас',
       log: () => {},
     }),
     notifier: { send: async () => true },

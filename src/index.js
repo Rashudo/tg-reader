@@ -238,6 +238,7 @@ async function startReplies() {
       createMessage: news.createAnthropicCall(config.anthropicKey),
       samples: voice.samples,
       maxChars: config.replies.maxChars,
+      name: me.firstName || me.username || 'я',
       log,
     }),
     notifier,

@@ -44,7 +44,12 @@ function createReplier({
 
   async function speak({ mode, trigger }) {
     const composed = await responder.compose({
-      window: window.map((msg) => ({ id: msg.id, author: msg.author, text: msg.text })),
+      window: window.map((msg) => ({
+        id: msg.id,
+        author: msg.author,
+        text: msg.text,
+        mine: String(msg.from) === String(meId),
+      })),
       trigger: trigger ? { id: trigger.id, author: trigger.author, text: trigger.text } : null,
       mode,
     });

@@ -287,3 +287,22 @@ test('строгий режим снимает очередь на любое с
   await replier.flush();
   assert.strictEqual(sent.length, 0);
 });
+
+test('оркестратор помечает свои сообщения, чтобы модель не путала себя с другими', async () => {
+  const seen = [];
+  const { replier, clock } = rig({
+    responder: {
+      compose: async (input) => {
+        seen.push(input);
+        return { reply: true, text: 'ага', replyToId: 11 };
+      },
+    },
+  });
+  await replier.onMessage(MINE);
+  await replier.onMessage(ASK);
+  clock.advance(5 * MIN);
+  await replier.flush();
+  const window = seen[0].window;
+  assert.strictEqual(window.find((msg) => msg.id === 10).mine, true);
+  assert.strictEqual(window.find((msg) => msg.id === 11).mine, false);
+});

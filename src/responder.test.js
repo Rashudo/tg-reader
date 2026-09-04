@@ -123,3 +123,37 @@ test('ответ без учёта токенов не роняет вызов',
   });
   assert.strictEqual((await responder.compose({ window: WINDOW, trigger: null, mode: 'spontaneous' })).reply, false);
 });
+
+test('промпт ставит модель на место самого хозяина, а не наблюдателя', () => {
+  const prompt = systemPrompt({ samples: [], maxChars: 160, mode: 'addressed', name: 'Стас' });
+  assert.match(prompt, /ты — Стас/i);
+  assert.match(prompt, /первого лица/i);
+  assert.ok(!/Он там свой/.test(prompt));
+});
+
+test('промпт запрещает говорить о себе по имени', () => {
+  assert.match(systemPrompt({ samples: [], maxChars: 160, mode: 'spontaneous', name: 'Стас' }), /третьем лице/i);
+});
+
+test('свои сообщения в окне подписаны «ты», а не именем', async () => {
+  const seen = [];
+  const responder = createResponder({
+    createMessage: async (req) => {
+      seen.push(req);
+      return answer({ reply: false, text: '' });
+    },
+    samples: [],
+    name: 'Стас',
+  });
+  await responder.compose({
+    window: [
+      { id: 1, author: 'Стас', mine: true, text: 'сейчас гляну' },
+      { id: 2, author: 'Тимур', mine: false, text: 'ну как?' },
+    ],
+    trigger: null,
+    mode: 'spontaneous',
+  });
+  const content = seen[0].messages[0].content;
+  assert.match(content, /\[1\] ты: сейчас гляну/);
+  assert.match(content, /\[2\] Тимур: ну как\?/);
+});
