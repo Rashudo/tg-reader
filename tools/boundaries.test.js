@@ -66,3 +66,16 @@ test('правило 6: telegram импортируется только в plat
   }
   assert.deepStrictEqual(guilty, [], `gramjs протёк за пределы адаптера: ${guilty.join(', ')}`);
 });
+
+test('правило 2: фича не импортирует чужую фичу', () => {
+  const guilty = [];
+  for (const [file, imports] of importsBySrcFile()) {
+    const own = file.match(/^features\/([^/]+)\//);
+    if (!own) continue;
+    for (const name of imports) {
+      const target = name.match(/features\/([^/]+)\//);
+      if (target && target[1] !== own[1]) guilty.push(`${file} -> ${name}`);
+    }
+  }
+  assert.deepStrictEqual(guilty, [], `общее место фич — platform или shared: ${guilty.join(', ')}`);
+});

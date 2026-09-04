@@ -1,8 +1,3 @@
-const fs = require('fs');
-const path = require('path');
-
-const VOICE_PATH = process.env.TG_VOICE_PATH || path.join(__dirname, '..', 'voice.json');
-
 function pickSamples(messages, { limit = 60, minWords = 3, maxChars = 200 } = {}) {
   const seen = new Set();
   const picked = [];
@@ -20,16 +15,10 @@ function pickSamples(messages, { limit = 60, minWords = 3, maxChars = 200 } = {}
   return picked;
 }
 
-function loadVoice(file = VOICE_PATH) {
-  try {
-    const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
-    const samples = Array.isArray(parsed && parsed.samples)
-      ? parsed.samples.filter((item) => typeof item === 'string' && item.trim())
-      : [];
-    return { samples };
-  } catch (err) {
-    return { samples: [] };
-  }
+function samplesOf(parsed) {
+  return Array.isArray(parsed && parsed.samples)
+    ? parsed.samples.filter((item) => typeof item === 'string' && item.trim())
+    : [];
 }
 
-module.exports = { loadVoice, pickSamples, VOICE_PATH };
+module.exports = { pickSamples, samplesOf };

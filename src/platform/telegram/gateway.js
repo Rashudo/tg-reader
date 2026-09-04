@@ -175,4 +175,4 @@ function createGateway({ client, clock, log = () => {}, albumWindowMs = ALBUM_WI
   };
 }
 
-module.exports = { createGateway, subscribeMessages, keyOf, eventKeyOf };
+module.exports = { createGateway, keyOf, eventKeyOf };

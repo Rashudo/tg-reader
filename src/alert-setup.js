@@ -2,7 +2,7 @@ const https = require('https');
 const path = require('path');
 const { config } = require('./config');
 const { setEnvVar } = require('./envfile');
-const { createNotifier } = require('./notify');
+const { createNotifier } = require('./platform/notify/telegram-bot');
 
 const ENV_PATH = path.join(__dirname, '..', '.env');
 

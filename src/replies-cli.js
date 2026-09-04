@@ -1,9 +1,15 @@
 const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const { config } = require('./config');
-const { createReplier } = require('./replier');
-const { createResponder } = require('./responder');
-const { loadVoice } = require('./voice');
-const { anthropicRequest: createAnthropicCall } = require('./platform/llm/anthropic');
+const { createRepliesJob } = require('./features/replies/job');
+const { createRepliesStore } = require('./features/replies/store');
+const { samplesOf } = require('./features/replies/voice');
+const { readJson } = require('./platform/json-file');
+const { openDb } = require('./platform/db/open');
+const { createLlm } = require('./platform/llm/anthropic');
+
+const VOICE_PATH = process.env.TG_VOICE_PATH || path.join(__dirname, '..', 'voice.json');
 
 const ME = process.env.REPLY_ME_ID || '6307473828';
 const TICK_MS = 25 * 60 * 1000;
@@ -14,20 +20,8 @@ function nameFor(id, names) {
   return names.get(id);
 }
 
-function memoryState() {
-  const answered = new Set();
-  const counters = { addressed: 0, spontaneous: 0, lastAddressedAt: 0, lastSpontaneousAt: 0 };
-  return {
-    repliesEnabled: () => true,
-    replyCounters: () => ({ ...counters }),
-    noteReply: (kind, at) => {
-      counters[kind] += 1;
-      counters[kind === 'addressed' ? 'lastAddressedAt' : 'lastSpontaneousAt'] = at;
-    },
-    wasAnswered: (id) => answered.has(id),
-    noteAnswered: (id) => answered.add(id),
-    totals: () => counters,
-  };
+function scratchStore() {
+  return createRepliesStore(openDb(path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'replies-dry-')), 'state.db')));
 }
 
 (async () => {
@@ -39,8 +33,8 @@ function memoryState() {
 
   const day = JSON.parse(fs.readFileSync(process.argv[fileArg + 1], 'utf8')).sort((a, b) => a.date - b.date);
   const names = new Map();
-  const voice = loadVoice();
-  const state = memoryState();
+  const samples = samplesOf(readJson(VOICE_PATH, null));
+  const store = scratchStore();
   const sent = [];
   const reasons = new Map();
   const note = (line) => {
@@ -59,26 +53,26 @@ function memoryState() {
   };
   let clock = day[0].date * 1000;
 
-  console.log(`Прогон без отправки: ${day.length} сообщений, образцов речи ${voice.samples.length}`);
+  console.log(`Прогон без отправки: ${day.length} сообщений, образцов речи ${samples.length}`);
 
-  const replier = createReplier({
-    client: {
-      sendMessage: async (chat, options) => {
-        sent.push({ at: clock, ...options });
-        return { id: 0 };
+  const chat = { key: 'файл', title: 'файл', username: null, id: 0 };
+  const replier = createRepliesJob({
+    gateway: {
+      async resolveChat() { return chat; },
+      async sendText(target, text, options = {}) {
+        const post = { id: 0, chatKey: chat.key, at: clock, text, from: ME, author: 'Стас', replyTo: options.replyTo || null, groupId: null, link: '' };
+        sent.push({ at: clock, message: text, replyTo: post.replyTo });
+        return post;
       },
+      onPost() { return () => {}; },
     },
-    chat: 'файл',
-    state,
-    responder: createResponder({
-      model: config.replies.model,
-      createMessage: createAnthropicCall(config.anthropicKey),
-      samples: voice.samples,
-      maxChars: config.replies.maxChars,
-      name: 'Стас',
-      log: () => {},
-    }),
-    notifier: { send: async () => true },
+    chat,
+    store,
+    llm: createLlm({ apiKey: config.anthropicKey, log: () => {} }),
+    model: config.replies.model,
+    samples,
+    meName: 'Стас',
+    notifier: { enabled: false, send: async () => true },
     meId: ME,
     aliases: config.replies.aliases.length ? config.replies.aliases : ['стас', 'станислав'],
     limits: {
@@ -92,11 +86,12 @@ function memoryState() {
       context: config.replies.context,
       minFresh: config.replies.minFresh,
       ownerSilenceMs: config.replies.ownerSilenceMin * 60 * 1000,
+      maxChars: config.replies.maxChars,
     },
     ownerCancel: config.replies.ownerCancel,
     staleAfterMs: config.replies.staleAfterMin * 60 * 1000,
     log: note,
-    now: () => clock,
+    clock: { now: () => clock, every: () => () => {}, after: () => () => {}, cancelAll: () => {} },
     random: () => 0.5,
   });
 
@@ -134,7 +129,7 @@ function memoryState() {
       console.log(`${when(item.at)}  (без привязки) → ${item.message}\n`);
     }
   }
-  console.log(`Итого: на обращения ${state.totals().addressed}, своих реплик ${state.totals().spontaneous}`);
+  console.log(`Итого: сказано ${sent.length} раз`);
   console.log('\nПочему молчал:');
   for (const [key, count] of [...reasons.entries()].sort((a, b) => b[1] - a[1])) {
     console.log(`  ${key}: ${count}`);

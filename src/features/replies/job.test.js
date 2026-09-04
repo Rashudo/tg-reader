@@ -1,58 +1,48 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { createReplier } = require('./replier');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const { openDb } = require('../../platform/db/open');
+const { createManualClock } = require('../../platform/clock');
+const { createFakeGateway } = require('../../platform/telegram/fake');
+const { createFakeNotifier } = require('../../platform/notify/fake');
+const { createRepliesStore } = require('./store');
+const { createRepliesJob } = require('./job');
 
 const ME = 'me';
 const NOON = new Date('2026-09-04T12:00:00+02:00').getTime();
 const MIN = 60 * 1000;
+const CHAT = { key: '-100111', title: 'Чат', username: 'chat', id: 111 };
 
-function fakeState() {
-  let enabled = true;
-  const said = [];
-  const answered = new Set();
-  const counters = { addressed: 0, spontaneous: 0, lastAddressedAt: 0, lastSpontaneousAt: 0 };
-  return {
-    repliesEnabled: () => enabled,
-    setRepliesEnabled: (on) => {
-      enabled = on;
-    },
-    replyCounters: () => ({ ...counters }),
-    noteReply: (kind, at) => {
-      counters[kind] += 1;
-      counters[kind === 'addressed' ? 'lastAddressedAt' : 'lastSpontaneousAt'] = at;
-    },
-    wasAnswered: (id) => answered.has(id),
-    noteAnswered: (id) => answered.add(id),
-    recentReplies: () => [...said],
-    noteSaid: (text) => said.push(text),
-  };
+function freshStore() {
+  return createRepliesStore(openDb(path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'rj-')), 'state.db')));
 }
 
 function rig(over = {}) {
-  const sent = [];
   const alerts = [];
   const logs = [];
-  let now = NOON;
-
-  const clock = {
-    advance(ms) {
-      now += ms;
-    },
+  const clock = createManualClock(NOON);
+  const gateway = createFakeGateway({ clock });
+  gateway.addChat('@chat', CHAT);
+  const store = over.store || freshStore();
+  const notifier = createFakeNotifier({ chatId: '7' });
+  notifier.send = async (text, options = {}) => {
+    alerts.push({ text, ...options });
+    return true;
   };
 
-  const replier = createReplier({
-    client: {
-      sendMessage: async (chat, options) => {
-        sent.push({ chat, ...options });
-        return { id: 900 + sent.length };
-      },
-    },
-    chat: 'чат',
-    state: over.state || fakeState(),
-    responder: over.responder || { compose: async () => ({ reply: true, text: 'ага', replyToId: 11 }) },
-    notifier: { send: async (text, options) => alerts.push({ text, ...options }) },
+  const replier = createRepliesJob({
+    gateway,
+    chat: CHAT,
+    store,
+    llm: { call: async () => ({ json: { reply: true, text: 'ага', replyToId: 11 }, text: '', usage: {}, cost: 0 }) },
+    notifier,
     meId: ME,
+    meName: 'Стас',
+    model: 'claude-opus-4-8',
     aliases: ['стас'],
+    compose: over.compose || (async () => ({ reply: true, text: 'ага', replyToId: 11 })),
     limits: {
       dailyBudget: 4,
       addressedBudget: 10,
@@ -64,14 +54,25 @@ function rig(over = {}) {
       context: 30,
       minFresh: 5,
       ownerSilenceMs: 15 * MIN,
+      maxChars: 160,
     },
+    clock,
     log: (line) => logs.push(line),
-    now: () => now,
     random: () => 0.5,
     ...over.extra,
   });
 
-  return { replier, sent, alerts, logs, clock, state: over.state };
+  const sent = {
+    get length() {
+      return gateway.sent.length;
+    },
+  };
+  const view = (post) => ({ message: post.text, replyTo: post.replyTo, parseMode: false, chat: CHAT });
+  Object.defineProperty(sent, 0, { get: () => view(gateway.sent[0]) });
+  Object.defineProperty(sent, 1, { get: () => view(gateway.sent[1]) });
+  Object.defineProperty(sent, 2, { get: () => view(gateway.sent[2]) });
+
+  return { replier, sent, alerts, logs, clock, store, gateway };
 }
 
 const ASK = { id: 11, from: 'other', author: 'Тимур', replyTo: 10, text: 'ну как?' };
@@ -137,11 +138,10 @@ test('копия отправленного уходит в бота с кноп
 });
 
 test('выключённые ответы не отправляются даже из очереди', async () => {
-  const state = fakeState();
-  const { replier, sent, clock } = rig({ state });
+  const { replier, sent, clock, store } = rig();
   await replier.onMessage(MINE);
   await replier.onMessage(ASK);
-  state.setRepliesEnabled(false);
+  store.setEnabled(false);
   clock.advance(5 * MIN);
   await replier.flush();
   assert.strictEqual(sent.length, 0);
@@ -149,11 +149,9 @@ test('выключённые ответы не отправляются даже
 
 test('ошибка модели гасится: молчим и не роняем сервис', async () => {
   const { replier, sent, clock, logs } = rig({
-    responder: {
-      compose: async () => {
+    compose: async () => {
         throw new Error('502');
       },
-    },
   });
   await replier.onMessage(MINE);
   await replier.onMessage(ASK);
@@ -164,7 +162,7 @@ test('ошибка модели гасится: молчим и не роняе�
 });
 
 test('решение модели промолчать уважается', async () => {
-  const { replier, sent, clock } = rig({ responder: { compose: async () => ({ reply: false, text: '', replyToId: null }) } });
+  const { replier, sent, clock } = rig({ compose: async () => ({ reply: false, text: '', replyToId: null }) });
   await replier.onMessage(MINE);
   await replier.onMessage(ASK);
   clock.advance(5 * MIN);
@@ -294,12 +292,10 @@ test('строгий режим снимает очередь на любое с
 test('оркестратор помечает свои сообщения, чтобы модель не путала себя с другими', async () => {
   const seen = [];
   const { replier, clock } = rig({
-    responder: {
-      compose: async (input) => {
+    compose: async (input) => {
         seen.push(input);
         return { reply: true, text: 'ага', replyToId: 11 };
       },
-    },
   });
   await replier.onMessage(MINE);
   await replier.onMessage(ASK);
@@ -351,25 +347,26 @@ test('слишком старая заготовка выбрасывается,
 });
 
 test('своя отправленная реплика попадает в окно разговора', async () => {
-  const { replier, clock } = rig();
+  const { replier, clock, gateway } = rig();
   await replier.onMessage(MINE);
   await replier.onMessage(ASK);
   clock.advance(5 * MIN);
   await replier.flush();
-  const own = replier.window().find((msg) => msg.id === 901);
+  const postedId = gateway.sent[0].id;
+  const own = replier.window().find((msg) => msg.id === postedId);
   assert.ok(own, 'отправленная реплика должна быть в окне');
   assert.strictEqual(own.from, ME);
   assert.strictEqual(own.text, 'ага');
 });
 
 test('ответ на реплику бота — такое же обращение, как ответ на слова хозяина', async () => {
-  const { replier, sent, clock } = rig();
+  const { replier, sent, clock, gateway } = rig();
   await replier.onMessage(MINE);
   await replier.onMessage(ASK);
   clock.advance(5 * MIN);
   await replier.flush();
   assert.strictEqual(sent.length, 1);
-  await replier.onMessage({ id: 20, from: 'other', author: 'Женя', replyTo: 901, text: 'да ладно?' });
+  await replier.onMessage({ id: 20, from: 'other', author: 'Женя', replyTo: gateway.sent[0].id, text: 'да ладно?' });
   assert.strictEqual(replier.pending(), 1);
 });
 
@@ -409,7 +406,7 @@ test('история без текста в окно не идёт', async () =>
 test('повтор собственной шутки не отправляется', async () => {
   let text = 'только на рот парня';
   const { replier, sent, clock, logs } = rig({
-    responder: { compose: async () => ({ reply: true, text, replyToId: 11 }) },
+    compose: async () => ({ reply: true, text, replyToId: 11 }),
   });
   await replier.onMessage(MINE);
   await replier.onMessage(ASK);
@@ -428,7 +425,7 @@ test('повтор собственной шутки не отправляетс
 test('новая мысль после повтора проходит', async () => {
   let text = 'только на рот парня';
   const { replier, sent, clock } = rig({
-    responder: { compose: async () => ({ reply: true, text, replyToId: 11 }) },
+    compose: async () => ({ reply: true, text, replyToId: 11 }),
   });
   await replier.onMessage(MINE);
   await replier.onMessage(ASK);
@@ -446,12 +443,10 @@ test('оркестратор отдаёт модели список уже ск�
   const seen = [];
   let text = 'только на рот парня';
   const { replier, clock } = rig({
-    responder: {
-      compose: async (input) => {
+    compose: async (input) => {
         seen.push(input);
         return { reply: true, text, replyToId: 11 };
       },
-    },
   });
   await replier.onMessage(MINE);
   await replier.onMessage(ASK);
@@ -468,25 +463,22 @@ test('оркестратор отдаёт модели список уже ск�
 });
 
 test('при старте свои реплики из истории попадают в память о сказанном', async () => {
-  const state = fakeState();
-  const { replier } = rig({ state });
+  const { replier, store } = rig();
   replier.seed([
     { id: 1, from: 'other', author: 'Тимур', replyTo: null, text: 'а пирог будет?' },
     { id: 2, from: ME, author: 'Стас', replyTo: 1, text: 'только на рот парня' },
     { id: 3, from: ME, author: 'Стас', replyTo: null, text: 'два рта в одном тимуре' },
   ]);
-  assert.deepStrictEqual(state.recentReplies(), ['только на рот парня', 'два рта в одном тимуре']);
+  assert.deepStrictEqual(store.recent(8).reverse(), ['только на рот парня', 'два рта в одном тимуре']);
 });
 
 test('после старта модель сразу знает, что уже было сказано', async () => {
   const seen = [];
   const { replier, clock } = rig({
-    responder: {
-      compose: async (input) => {
+    compose: async (input) => {
         seen.push(input);
         return { reply: false, text: '', replyToId: null };
       },
-    },
   });
   replier.seed([{ id: 2, from: ME, author: 'Стас', replyTo: null, text: 'только на рот парня' }]);
   await replier.onMessage({ id: 5, from: 'other', author: 'Женя', replyTo: 2, text: 'опять?' });

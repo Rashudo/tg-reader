@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { createResponder, systemPrompt, clampText } = require('./responder');
+const { createResponder, systemPrompt, clampText } = require('./prompt');
 
 function answer(payload) {
   return { content: [{ type: 'text', text: JSON.stringify(payload) }], usage: {} };
@@ -12,26 +12,26 @@ const WINDOW = [
 ];
 
 test('модель вправе промолчать, это не ошибка', async () => {
-  const responder = createResponder({ createMessage: async () => answer({ reply: false, text: '' }), samples: [] });
+  const responder = createResponder({ request: async () => answer({ reply: false, text: '' }), samples: [] });
   const out = await responder.compose({ window: WINDOW, trigger: null, mode: 'spontaneous' });
   assert.strictEqual(out.reply, false);
 });
 
 test('в ответе на обращение replyToId — это триггер', async () => {
-  const responder = createResponder({ createMessage: async () => answer({ reply: true, text: 'ага' }), samples: [] });
+  const responder = createResponder({ request: async () => answer({ reply: true, text: 'ага' }), samples: [] });
   const out = await responder.compose({ window: WINDOW, trigger: { id: 7, author: 'Тимур', text: 'ты идёшь?' }, mode: 'addressed' });
   assert.strictEqual(out.replyToId, 7);
   assert.strictEqual(out.text, 'ага');
 });
 
 test('спонтанная реплика цепляется к сообщению, которое выбрала модель', async () => {
-  const responder = createResponder({ createMessage: async () => answer({ reply: true, text: 'ну да', replyToId: 2 }), samples: [] });
+  const responder = createResponder({ request: async () => answer({ reply: true, text: 'ну да', replyToId: 2 }), samples: [] });
   const out = await responder.compose({ window: WINDOW, trigger: null, mode: 'spontaneous' });
   assert.strictEqual(out.replyToId, 2);
 });
 
 test('выдуманный id сообщения отбрасывается', async () => {
-  const responder = createResponder({ createMessage: async () => answer({ reply: true, text: 'ну да', replyToId: 999 }), samples: [] });
+  const responder = createResponder({ request: async () => answer({ reply: true, text: 'ну да', replyToId: 999 }), samples: [] });
   const out = await responder.compose({ window: WINDOW, trigger: null, mode: 'spontaneous' });
   assert.strictEqual(out.replyToId, null);
 });
@@ -42,14 +42,14 @@ test('слишком длинный ответ обрезается по гра�
 });
 
 test('пустой текст при reply:true — это молчание', async () => {
-  const responder = createResponder({ createMessage: async () => answer({ reply: true, text: '   ' }), samples: [] });
+  const responder = createResponder({ request: async () => answer({ reply: true, text: '   ' }), samples: [] });
   const out = await responder.compose({ window: WINDOW, trigger: null, mode: 'spontaneous' });
   assert.strictEqual(out.reply, false);
 });
 
 test('невалидный JSON — молчим, а не шлём мусор', async () => {
   const responder = createResponder({
-    createMessage: async () => ({ content: [{ type: 'text', text: 'не json' }], usage: {} }),
+    request: async () => ({ content: [{ type: 'text', text: 'не json' }], usage: {} }),
     samples: [],
   });
   const out = await responder.compose({ window: WINDOW, trigger: null, mode: 'spontaneous' });
@@ -59,7 +59,7 @@ test('невалидный JSON — молчим, а не шлём мусор', 
 test('ошибка сети пробрасывается наверх без повторов', async () => {
   let calls = 0;
   const responder = createResponder({
-    createMessage: async () => {
+    request: async () => {
       calls += 1;
       throw new Error('502');
     },
@@ -73,7 +73,7 @@ test('в запрос уходит выбранная модель', async () =>
   const seen = [];
   const responder = createResponder({
     model: 'claude-opus-5',
-    createMessage: async (req) => {
+    request: async (req) => {
       seen.push(req);
       return answer({ reply: false, text: '' });
     },
@@ -104,7 +104,7 @@ test('без образцов речи промпт не разваливает�
 test('стоимость вызова попадает в журнал', async () => {
   const lines = [];
   const responder = createResponder({
-    createMessage: async () => ({
+    request: async () => ({
       content: [{ type: 'text', text: JSON.stringify({ reply: false, text: '' }) }],
       usage: { input_tokens: 2000, output_tokens: 50 },
     }),
@@ -117,7 +117,7 @@ test('стоимость вызова попадает в журнал', async (
 
 test('ответ без учёта токенов не роняет вызов', async () => {
   const responder = createResponder({
-    createMessage: async () => ({ content: [{ type: 'text', text: JSON.stringify({ reply: false, text: '' }) }] }),
+    request: async () => ({ content: [{ type: 'text', text: JSON.stringify({ reply: false, text: '' }) }] }),
     samples: [],
     log: () => {},
   });
@@ -138,7 +138,7 @@ test('промпт запрещает говорить о себе по имен
 test('свои сообщения в окне подписаны «ты», а не именем', async () => {
   const seen = [];
   const responder = createResponder({
-    createMessage: async (req) => {
+    request: async (req) => {
       seen.push(req);
       return answer({ reply: false, text: '' });
     },
@@ -178,7 +178,7 @@ test('без списка сказанного промпт не ломаетс�
 test('список сказанного доезжает до запроса', async () => {
   const seen = [];
   const responder = createResponder({
-    createMessage: async (req) => {
+    request: async (req) => {
       seen.push(req);
       return answer({ reply: false, text: '' });
     },
@@ -205,7 +205,7 @@ test('промпт ставит ответ по существу выше раз
 test('на ответ отводится вдвое больше токенов', async () => {
   const seen = [];
   const responder = createResponder({
-    createMessage: async (req) => {
+    request: async (req) => {
       seen.push(req);
       return answer({ reply: false, text: '' });
     },

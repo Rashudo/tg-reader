@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { createNotifier } = require('./notify');
+const { createNotifier } = require('./telegram-bot');
 
 function fake() {
   const calls = [];
@@ -91,4 +91,40 @@ test('без кнопок клавиатура не отправляется', a
   const notifier = createNotifier({ token: 't', chatId: '7', request: async (url, body) => { calls.push(body); return { ok: true }; } });
   await notifier.send('готово');
   assert.strictEqual(calls[0].reply_markup, undefined);
+});
+
+test('updates двигает offset на единицу дальше последнего обновления', async () => {
+  const notifier = createNotifier({
+    token: 't', chatId: '1',
+    request: async () => ({ result: [{ update_id: 10 }, { update_id: 11 }] }),
+  });
+  const { updates, nextOffset } = await notifier.updates(5);
+  assert.strictEqual(updates.length, 2);
+  assert.strictEqual(nextOffset, 12);
+});
+
+test('пустой ответ offset не двигает', async () => {
+  const notifier = createNotifier({ token: 't', chatId: '1', request: async () => ({ result: [] }) });
+  assert.strictEqual((await notifier.updates(7)).nextOffset, 7);
+});
+
+test('без токена чтение не ходит в сеть и отдаёт пустоту', async () => {
+  let called = false;
+  const notifier = createNotifier({ token: '', chatId: '', request: async () => { called = true; } });
+  const { updates, nextOffset } = await notifier.updates(3);
+  assert.deepStrictEqual(updates, []);
+  assert.strictEqual(nextOffset, 3);
+  assert.strictEqual(called, false);
+});
+
+test('чтение и запись идут через один и тот же транспорт', async () => {
+  const urls = [];
+  const notifier = createNotifier({
+    token: 't', chatId: '1',
+    request: async (url) => { urls.push(url); return { result: [] }; },
+  });
+  await notifier.send('привет');
+  await notifier.updates(0);
+  assert.match(urls[0], /sendMessage/);
+  assert.match(urls[1], /getUpdates/);
 });

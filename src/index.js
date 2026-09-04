@@ -1,22 +1,23 @@
+const path = require('path');
 const { config } = require('./config');
 const { createClient } = require('./client');
 const { readSetup } = require('./preflight');
 const { prepare, summary, unknownGroups } = require('./features/forwarding/matcher');
-const { peerKey, eventPeerKey } = require('./peer');
-const { subscribeMessages, createGateway } = require('./platform/telegram/gateway');
+const { createGateway } = require('./platform/telegram/gateway');
 const { createClock } = require('./platform/clock');
 const { createState } = require('./state');
 const { withTimeout } = require('./async');
 const { createWatchdog, createStallWatchdog } = require('./watchdog');
-const { createNotifier } = require('./notify');
+const { createNotifier } = require('./platform/notify/telegram-bot');
 const { createForwardingJob } = require('./features/forwarding/job');
-const { createReplier } = require('./replier');
-const { createResponder } = require('./responder');
-const { createBotCommands } = require('./bot-commands');
-const { loadVoice } = require('./voice');
+const { createRepliesJob } = require('./features/replies/job');
+const { samplesOf } = require('./features/replies/voice');
+const { readJson } = require('./platform/json-file');
 const { createDigestJob, resolveChats } = require('./features/digest/job');
-const { createLlm, anthropicRequest } = require('./platform/llm/anthropic');
+const { createLlm } = require('./platform/llm/anthropic');
 const keywords = require('../keywords');
+
+const VOICE_PATH = process.env.TG_VOICE_PATH || path.join(__dirname, '..', 'voice.json');
 
 const KEYWORDS = prepare(keywords, config.disabledGroups);
 
@@ -184,70 +185,38 @@ async function startNewsDigest() {
   );
 }
 
-function chatMessageOf(event, names) {
-  const msg = event.message;
-  if (!msg) return null;
-  const from = msg.senderId ? String(msg.senderId) : null;
-  return {
-    id: msg.id,
-    from,
-    author: (from && names.get(from)) || 'кто-то',
-    replyTo: msg.replyTo ? msg.replyTo.replyToMsgId : null,
-    text: msg.message || '',
-  };
-}
-
 async function startReplies() {
-  if (!config.replies.chat) {
-    log('Автоответы выключены: REPLY_CHAT не задан');
-    return;
-  }
-  if (!config.anthropicKey) {
-    log('Автоответы выключены: нет ANTHROPIC_API_KEY');
-    return;
-  }
-  if (!config.replies.enabled) {
-    log('Автоответы выключены: REPLY_ENABLED=off');
+  if (!setup.features.replies.on) {
+    log(`Автоответы выключены: ${setup.features.replies.why}`);
     return;
   }
 
   let chat;
   try {
-    chat = await client.getEntity(config.replies.chat);
+    chat = await gateway.resolveChat(config.replies.chat);
   } catch (err) {
     log(`Автоответы выключены: не удалось открыть чат "${config.replies.chat}" (${err.message})`);
     return;
   }
 
-  const me = await client.getMe();
-  const names = new Map();
-  try {
-    for (const person of await client.getParticipants(chat)) {
-      names.set(String(person.id), person.firstName || person.username || String(person.id));
-    }
-  } catch (err) {
-    log(`Имена участников чата не прочитались (${err.message}) — обойдусь без них`);
-  }
+  const me = await gateway.me();
+  await gateway.members(chat);
 
-  const voice = loadVoice();
-  if (voice.samples.length === 0) {
+  const samples = samplesOf(readJson(VOICE_PATH, null));
+  if (samples.length === 0) {
     log('Автоответы: образцов речи нет, ответы будут безликими — соберите voice.json');
   }
 
-  const replier = createReplier({
-    client,
+  const replier = createRepliesJob({
+    gateway,
     chat,
-    state,
-    responder: createResponder({
-      model: config.replies.model,
-      createMessage: anthropicRequest(config.anthropicKey),
-      samples: voice.samples,
-      maxChars: config.replies.maxChars,
-      name: me.firstName || me.username || 'я',
-      log,
-    }),
+    store: state.stores.replies,
+    llm: createLlm({ apiKey: config.anthropicKey, log }),
     notifier,
-    meId: String(me.id),
+    meId: me.id,
+    meName: me.name,
+    model: config.replies.model,
+    samples,
     aliases: config.replies.aliases,
     limits: {
       dailyBudget: config.replies.dailyBudget,
@@ -260,55 +229,30 @@ async function startReplies() {
       context: config.replies.context,
       minFresh: config.replies.minFresh,
       ownerSilenceMs: config.replies.ownerSilenceMin * 60 * 1000,
+      maxChars: config.replies.maxChars,
     },
     ownerCancel: config.replies.ownerCancel,
     staleAfterMs: config.replies.staleAfterMin * 60 * 1000,
+    clock,
     log,
+    flushEveryMs: REPLY_FLUSH_INTERVAL_MS,
+    tickEveryMs: REPLY_TICK_INTERVAL_MS,
+    pollEveryMs: BOT_POLL_INTERVAL_MS,
   });
 
   try {
-    const history = await client.getMessages(chat, { limit: config.replies.context });
-    replier.seed(
-      [...history].reverse().map((msg) => ({
-        id: msg.id,
-        from: msg.senderId ? String(msg.senderId) : null,
-        author: (msg.senderId && names.get(String(msg.senderId))) || 'кто-то',
-        replyTo: msg.replyTo ? msg.replyTo.replyToMsgId : null,
-        text: msg.message || '',
-      }))
-    );
+    const history = await gateway.recent(chat, { limit: config.replies.context });
+    replier.seed(history);
     log(`Ответчик: подтянул ${replier.window().length} сообщений чата для контекста`);
   } catch (err) {
     log(`Ответчик: историю чата подтянуть не удалось (${err.message}) — начинаю с пустого окна`);
   }
 
-  const chatKey = peerKey(chat);
-  subscribeMessages(client, (event) => {
-    if (eventPeerKey(event) !== chatKey) return;
-    const msg = chatMessageOf(event, names);
-    if (!msg) return;
-    replier.onMessage(msg).catch((err) => log(`Ответчик споткнулся на сообщении: ${err.message}`));
-  });
-
-  setInterval(() => {
-    replier.flush().catch((err) => log(`Ответчик: очередь не разобралась (${err.message})`));
-  }, REPLY_FLUSH_INTERVAL_MS);
-
-  setInterval(() => {
-    replier.tick().catch((err) => log(`Ответчик: проверка не удалась (${err.message})`));
-  }, REPLY_TICK_INTERVAL_MS);
-
-  createBotCommands({
-    token: config.alert.token,
-    chatId: config.alert.chatId,
-    state,
-    timeZone: config.replies.timeZone,
-    log,
-  }).start(BOT_POLL_INTERVAL_MS);
+  await replier.start();
 
   log(
-    `Автоответы: чат «${chat.title || config.replies.chat}», ${state.repliesEnabled() ? 'включены' : 'выключены'}, ` +
-      `образцов речи ${voice.samples.length}, модель ${config.replies.model}`
+    `Автоответы: чат «${chat.title || config.replies.chat}», ${state.stores.replies.enabled() ? 'включены' : 'выключены'}, ` +
+      `образцов речи ${samples.length}, модель ${config.replies.model}`
   );
 }
 

@@ -3,7 +3,10 @@ const assert = require('node:assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { loadVoice, pickSamples } = require('./voice');
+const { pickSamples, samplesOf } = require('./voice');
+const { readJson } = require('../../platform/json-file');
+
+const loadVoice = (file) => ({ samples: samplesOf(readJson(file, null)) });
 
 function tmpFile(content) {
   const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'voice-')), 'voice.json');

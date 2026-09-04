@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { isAddressed, inQuietHours, decideAddressed, decideSpontaneous } = require('./reply-rules');
+const { isAddressed, inQuietHours, decideAddressed, decideSpontaneous } = require('./rules');
 
 const TZ = 'Europe/Belgrade';
 const QUIET = { from: 23, to: 9, timeZone: TZ };

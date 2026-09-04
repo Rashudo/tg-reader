@@ -94,6 +94,7 @@ function createState(file = DB_PATH, { legacyFile = LEGACY_PATH } = {}) {
       writeStatus();
     },
 
+    stores: { forwarding, digest, replies },
     writeStatus,
     flush() {},
     close: () => db.close(),

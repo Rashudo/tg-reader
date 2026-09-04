@@ -3,7 +3,7 @@ const path = require('path');
 const { execFileSync } = require('child_process');
 const { config } = require('./config');
 const { createState } = require('./state');
-const { createNotifier } = require('./notify');
+const { createNotifier } = require('./platform/notify/telegram-bot');
 const { decide, parseUnitStatus } = require('./health');
 const { formatAlert } = require('./message');
 
