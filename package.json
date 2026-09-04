@@ -11,7 +11,7 @@
     "health": "node src/healthcheck.js",
     "digest": "node src/digest-cli.js",
     "alert-setup": "node src/alert-setup.js",
-    "test": "node --test src/*.test.js",
+    "test": "node --test",
     "replies": "node src/replies-cli.js",
     "voice": "node bin/export-voice.js"
   },
