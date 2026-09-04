@@ -17,6 +17,7 @@ function createReplier({
   random = Math.random,
   ownerCancel = 'answer',
   ownerAnswerMs = 60 * 1000,
+  staleAfterMs = 10 * 60 * 1000,
 }) {
   const window = [];
   const byId = new Map();
@@ -115,6 +116,11 @@ function createReplier({
       queue.push(...waiting);
 
       for (const item of due) {
+        if (at - item.queuedAt > staleAfterMs) {
+          log(`Ответчик: вопрос ${item.trigger.id} устарел, отвечать поздно`);
+          continue;
+        }
+
         const seen = counters();
         const verdict = decideAddressed({
           now: at,
@@ -126,7 +132,8 @@ function createReplier({
           pauseMs: limits.addressedPauseMs,
         });
         if (!verdict.allow) {
-          log(`Ответчик: на обращение ${item.trigger.id} не отвечаю — ${verdict.why}`);
+          if (!item.blocked) log(`Ответчик: на обращение ${item.trigger.id} пока не отвечаю — ${verdict.why}`);
+          queue.push({ ...item, blocked: true });
           continue;
         }
         try {

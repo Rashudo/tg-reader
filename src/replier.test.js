@@ -306,3 +306,43 @@ test('оркестратор помечает свои сообщения, чт�
   assert.strictEqual(window.find((msg) => msg.id === 10).mine, true);
   assert.strictEqual(window.find((msg) => msg.id === 11).mine, false);
 });
+
+test('заготовка, упёршаяся в паузу, ждёт следующей проверки, а не выбрасывается', async () => {
+  const { replier, sent, clock } = rig({
+    extra: {
+      limits: {
+        dailyBudget: 4,
+        addressedBudget: 10,
+        spontaneousPauseMs: 90 * MIN,
+        addressedPauseMs: 30 * 1000,
+        delayMinMs: 2 * MIN,
+        delayMaxMs: 4 * MIN,
+        quiet: { from: 23, to: 9, timeZone: 'Europe/Belgrade' },
+        context: 30,
+        minFresh: 5,
+        ownerSilenceMs: 15 * MIN,
+      },
+    },
+  });
+  await replier.onMessage(MINE);
+  await replier.onMessage(ASK);
+  await replier.onMessage({ id: 12, from: 'other', author: 'Женя', replyTo: 10, text: 'а ты как?' });
+  clock.advance(5 * MIN);
+  await replier.flush();
+  assert.strictEqual(sent.length, 1);
+  assert.strictEqual(replier.pending(), 1);
+  clock.advance(31 * 1000);
+  await replier.flush();
+  assert.strictEqual(sent.length, 2);
+});
+
+test('слишком старая заготовка выбрасывается, а не отвечает невпопад', async () => {
+  const { replier, sent, clock, logs } = rig();
+  await replier.onMessage(MINE);
+  await replier.onMessage(ASK);
+  clock.advance(20 * MIN);
+  await replier.flush();
+  assert.strictEqual(sent.length, 0);
+  assert.strictEqual(replier.pending(), 0);
+  assert.ok(logs.some((line) => /устарел/.test(line)));
+});

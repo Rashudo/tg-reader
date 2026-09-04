@@ -257,6 +257,7 @@ async function startReplies() {
       ownerSilenceMs: config.replies.ownerSilenceMin * 60 * 1000,
     },
     ownerCancel: config.replies.ownerCancel,
+    staleAfterMs: config.replies.staleAfterMin * 60 * 1000,
     log,
   });
 
