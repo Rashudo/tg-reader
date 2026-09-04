@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { prepare, findMatches, groupNames } = require('./matcher');
+const { prepare, findMatches, groupNames } = require('./features/forwarding/matcher');
 const keywords = require('../keywords');
 
 const KEYWORDS = prepare(keywords);

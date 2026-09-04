@@ -1,14 +1,15 @@
 const { config } = require('./config');
 const { createClient } = require('./client');
 const { readSetup } = require('./preflight');
-const { prepare, summary, unknownGroups } = require('./matcher');
+const { prepare, summary, unknownGroups } = require('./features/forwarding/matcher');
 const { peerKey, eventPeerKey } = require('./peer');
-const { subscribeMessages } = require('./platform/telegram/gateway');
+const { subscribeMessages, createGateway } = require('./platform/telegram/gateway');
+const { createClock } = require('./platform/clock');
 const { createState } = require('./state');
 const { withTimeout } = require('./async');
 const { createWatchdog, createStallWatchdog } = require('./watchdog');
 const { createNotifier } = require('./notify');
-const { createForwarder } = require('./forwarder');
+const { createForwardingJob } = require('./features/forwarding/job');
 const { createReplier } = require('./replier');
 const { createResponder } = require('./responder');
 const { createBotCommands } = require('./bot-commands');
@@ -35,6 +36,8 @@ const startedAt = Date.now();
 const sources = new Map();
 
 let client = null;
+let clock = null;
+let gateway = null;
 let forwarder = null;
 
 function log(...args) {
@@ -73,9 +76,9 @@ function shutdown(code) {
 async function startForwarding() {
   for (const ref of config.channels) {
     try {
-      const entity = await client.getEntity(ref);
-      sources.set(peerKey(entity), entity);
-      log(`Источник: ${entity.title || entity.username || ref} (id ${entity.id})`);
+      const chat = await gateway.resolveChat(ref);
+      sources.set(chat.key, chat);
+      log(`Источник: ${chat.title || chat.username || ref} (id ${chat.id})`);
     } catch (err) {
       console.error(`Не удалось открыть канал "${ref}": ${err.message}. Вы точно на него подписаны?`);
       process.exit(1);
@@ -84,7 +87,7 @@ async function startForwarding() {
 
   let target;
   try {
-    target = await client.getEntity(config.target);
+    target = await gateway.resolveChat(config.target);
   } catch (err) {
     console.error(`Не удалось открыть TARGET "${config.target}": ${err.message}`);
     process.exit(1);
@@ -92,27 +95,18 @@ async function startForwarding() {
   log(`Пересылка в: ${config.target === 'me' ? 'Избранное' : target.title || target.username || config.target}`);
   log(summary(keywords, KEYWORDS));
 
-  forwarder = createForwarder({
-    client,
-    state,
+  forwarder = createForwardingJob({
+    gateway,
+    store: state,
     sources,
-    target,
+    target: config.target,
     keywords: KEYWORDS,
     notifier,
+    clock,
     log,
-    peerKeyOf: peerKey,
-    eventKeyOf: eventPeerKey,
   });
 
-  subscribeMessages(client, (event) => forwarder.onMessage(event), { edits: true });
-
-  for (const source of sources.values()) {
-    try {
-      await forwarder.backfill(source);
-    } catch (err) {
-      log(`Не удалось догрузить пропущенное для ${source.title || source.username}: ${err.message}`);
-    }
-  }
+  await forwarder.start();
 
   createStallWatchdog({
     lastMessageAt: () => Math.max(state.lastMessageAt() || 0, startedAt),
@@ -322,6 +316,8 @@ async function main() {
 
   client = createClient();
   if (client.setLogLevel) client.setLogLevel('error');
+  clock = createClock();
+  gateway = createGateway({ client, clock, log });
 
   await withTimeout(client.connect(), CONNECT_TIMEOUT_MS, 'не удалось подключиться к Telegram за минуту');
 

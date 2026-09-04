@@ -1,7 +1,7 @@
 const { config } = require('./config');
 const { createClient } = require('./client');
 const { readSetup } = require('./preflight');
-const { prepare, findHits, describeHits, summary } = require('./matcher');
+const { prepare, findHits, describeHits, summary } = require('./features/forwarding/matcher');
 const keywords = require('../keywords');
 
 const DEFAULT_LIMIT = 100;
