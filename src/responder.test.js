@@ -195,10 +195,10 @@ test('промпт целиком на «ты», без следов треть�
   assert.ok(!/его пунктуация/i.test(prompt));
 });
 
-test('промпт ставит прямой ответ выше поддержания темы', () => {
+test('промпт ставит ответ по существу выше разговора ради разговора', () => {
   const prompt = systemPrompt({ samples: [], maxChars: 160, mode: 'addressed', name: 'Стас' });
-  assert.match(prompt, /ответь по существу/i);
-  assert.match(prompt, /той же формулировк|одну и ту же/i);
+  assert.match(prompt, /по существу/i);
+  assert.match(prompt, /ради разговора/i);
   assert.ok(!/можно и нужно/i.test(prompt));
 });
 
@@ -221,8 +221,14 @@ test('роль описана как постироничная, а не язв�
   assert.ok(!/язвительн/i.test(prompt));
 });
 
-test('запрещённые слова названы в промпте', () => {
-  const prompt = systemPrompt({ samples: [], maxChars: 160, mode: 'addressed', name: 'Стас', banned: ['рот парня'] });
-  assert.match(prompt, /рот парня/);
-  assert.match(prompt, /не используй/i);
+test('промпт требует отвечать на само сообщение, а переписку держать фоном', () => {
+  const prompt = systemPrompt({ samples: [], maxChars: 160, mode: 'addressed', name: 'Стас' });
+  assert.match(prompt, /по существу того, что тебе написали/i);
+  assert.match(prompt, /фон/i);
+  assert.ok(!/поддержать общую тему/i.test(prompt));
+});
+
+test('в режиме обращения задача — ответить именно на это сообщение', () => {
+  const prompt = systemPrompt({ samples: [], maxChars: 160, mode: 'addressed', name: 'Стас' });
+  assert.match(prompt, /именно на это сообщение/i);
 });

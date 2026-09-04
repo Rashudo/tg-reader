@@ -1,5 +1,5 @@
 const { isAddressed, decideAddressed, decideSpontaneous } = require('./reply-rules');
-const { repeatsRecent, hitsBanned } = require('./repetition');
+const { repeatsRecent } = require('./repetition');
 const { localDayOf } = require('./schedule');
 
 const OFF_BUTTON = [[{ text: 'Больше не отвечать', data: 'replies:off' }]];
@@ -20,7 +20,6 @@ function createReplier({
   ownerAnswerMs = 60 * 1000,
   staleAfterMs = 10 * 60 * 1000,
   echoGuard = 2,
-  banned = [],
 }) {
   const window = [];
   const byId = new Map();
@@ -51,7 +50,6 @@ function createReplier({
     const said = state.recentReplies();
     const composed = await responder.compose({
       avoid: said,
-      banned,
       window: window.map((msg) => ({
         id: msg.id,
         author: msg.author,
@@ -63,12 +61,6 @@ function createReplier({
     });
     if (!composed.reply) {
       log(`Ответчик: модель решила промолчать (${mode})`);
-      return false;
-    }
-
-    const forbidden = hitsBanned(composed.text, banned);
-    if (forbidden) {
-      log(`Ответчик: в реплике запрещённое «${forbidden}» — молчу («${composed.text}»)`);
       return false;
     }
 

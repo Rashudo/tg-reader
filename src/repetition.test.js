@@ -37,30 +37,3 @@ test('пустая история повторов не даёт', () => {
 test('одно слово повтором не считается', () => {
   assert.strictEqual(repeatsRecent('пирог', ['пирог с корицей и мясом']), false);
 });
-
-const { hitsBanned } = require('./repetition');
-
-test('запрещённое слово ловится в любой форме предложения', () => {
-  const banned = ['рот', 'рта', 'ртом', 'ртов'];
-  assert.strictEqual(hitsBanned('скоро весь гит будет одним большим ртом парня', banned), 'ртом');
-  assert.strictEqual(hitsBanned('только на рот парня', banned), 'рот');
-  assert.strictEqual(hitsBanned('11 ртов парня из 10', banned), 'ртов');
-});
-
-test('запрет по целому слову не цепляет другие слова', () => {
-  assert.strictEqual(hitsBanned('крот вырыл нору, а робот смотрел', ['рот']), null);
-});
-
-test('запрет из нескольких слов ищется как оборот', () => {
-  assert.strictEqual(hitsBanned('да это твой рот парня виноват', ['рот парня']), 'рот парня');
-  assert.strictEqual(hitsBanned('рот у парня', ['рот парня']), null);
-});
-
-test('пустой список запретов ничего не ловит', () => {
-  assert.strictEqual(hitsBanned('что угодно', []), null);
-});
-
-test('регистр и ё не мешают запрету', () => {
-  assert.strictEqual(hitsBanned('РОТ, Ёлки', ['рот']), 'рот');
-  assert.strictEqual(hitsBanned('ёлки зелёные', ['елки']), 'елки');
-});
