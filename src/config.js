@@ -59,6 +59,7 @@ const config = {
     ownerSilenceMin: numFromEnv(process.env.REPLY_OWNER_SILENCE_MIN, 15),
     maxChars: numFromEnv(process.env.REPLY_MAX_CHARS, 160),
     staleAfterMin: numFromEnv(process.env.REPLY_STALE_AFTER_MIN, 10),
+    threadLimit: numFromEnv(process.env.REPLY_THREAD_LIMIT, 2),
     goodReactions: listOr(process.env.REPLY_GOOD_REACTIONS, ['💯', '👍', '❤', '🔥']),
     badReactions: listOr(process.env.REPLY_BAD_REACTIONS, ['💩', '👎']),
     ownerCancel: (process.env.REPLY_OWNER_CANCEL || 'answer').trim().toLowerCase() === 'any' ? 'any' : 'answer',

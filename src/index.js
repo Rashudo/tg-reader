@@ -261,6 +261,7 @@ async function startReplies() {
       context: config.replies.context,
       minFresh: config.replies.minFresh,
       ownerSilenceMs: config.replies.ownerSilenceMin * 60 * 1000,
+      threadLimit: config.replies.threadLimit,
     },
     reactions: { good: config.replies.goodReactions, bad: config.replies.badReactions },
     ownerCancel: config.replies.ownerCancel,

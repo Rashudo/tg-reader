@@ -1,4 +1,5 @@
-const { isAddressed, decideAddressed, decideSpontaneous } = require('./reply-rules');
+const { isAddressed, mentionsAlias, decideAddressed, decideSpontaneous } = require('./reply-rules');
+const { botTurns, isFiller } = require('./thread');
 const { repeatsRecent } = require('./repetition');
 const { emojiCounts, emojiVotes, tally, verdictOf } = require('./reactions');
 const { localDayOf } = require('./schedule');
@@ -27,6 +28,7 @@ function createReplier({
 }) {
   const window = [];
   const byId = new Map();
+  const own = new Set();
   const queue = [];
   let ownerSpokeAt = null;
   let freshCount = 0;
@@ -64,7 +66,11 @@ function createReplier({
     return state.replyCounters(localDayOf(now(), limits.quiet.timeZone));
   }
 
-  async function speak({ mode, trigger }) {
+  function turnsBefore(msg) {
+    return botTurns(msg, { messageById: byId, mine: (parent) => own.has(parent.id) });
+  }
+
+  async function speak({ mode, trigger, followUp = false }) {
     const said = state.recentReplies();
     const composed = await responder.compose({
       avoid: said,
@@ -77,6 +83,7 @@ function createReplier({
       })),
       trigger: trigger ? { id: trigger.id, author: trigger.author, text: trigger.text } : null,
       mode,
+      followUp,
     });
     if (!composed.reply) {
       log(`Ответчик: модель решила промолчать (${mode})`);
@@ -98,6 +105,7 @@ function createReplier({
 
     const at = now();
     if (posted && Number.isInteger(posted.id)) {
+      own.add(posted.id);
       remember({
         id: posted.id,
         from: String(meId),
@@ -132,6 +140,8 @@ function createReplier({
     },
 
     seed(messages) {
+      const posted = state.postedReplies ? state.postedReplies() : [];
+      for (const item of posted) if (Number.isInteger(item.id)) own.add(item.id);
       for (const msg of messages) {
         const text = (msg.text || '').trim();
         if (!text) continue;
@@ -166,7 +176,19 @@ function createReplier({
       if (state.wasAnswered(msg.id)) return;
       if (queue.some((item) => item.trigger.id === msg.id)) return;
 
-      queue.push({ trigger: { ...msg, text }, queuedAt: now(), dueAt: now() + delayMs() });
+      const turns = turnsBefore(msg);
+      if (!mentionsAlias(text, aliases)) {
+        if (turns >= limits.threadLimit) {
+          log(`Ответчик: в ветке ${msg.id} уже ответил дважды — молчу`);
+          return;
+        }
+        if (turns > 0 && isFiller(text)) {
+          log(`Ответчик: пустое продолжение ${msg.id} — молчу`);
+          return;
+        }
+      }
+
+      queue.push({ trigger: { ...msg, text }, queuedAt: now(), dueAt: now() + delayMs(), followUp: turns > 0 });
       log(`Ответчик: обращение ${msg.id} в очереди`);
     },
 
@@ -200,7 +222,7 @@ function createReplier({
           continue;
         }
         try {
-          await speak({ mode: 'addressed', trigger: item.trigger });
+          await speak({ mode: 'addressed', trigger: item.trigger, followUp: Boolean(item.followUp) });
         } catch (err) {
           log(`Ответчик: ответ не сложился (${err.message}) — молчу`);
         }

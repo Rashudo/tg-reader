@@ -271,3 +271,27 @@ test('compose доносит оценки до модели', async () => {
   assert.match(seen, /зашло: «зашедшая реплика»/);
   assert.match(seen, /не зашло: «провальная реплика»/);
 });
+
+test('продолжение ветки требует повода, иначе молчание', () => {
+  const prompt = systemPrompt({ samples: [], maxChars: 160, mode: 'addressed', followUp: true });
+  assert.match(prompt, /продолжение/i);
+  assert.match(prompt, /reply: false/);
+});
+
+test('первое обращение о продолжении ветки не поминает', () => {
+  const prompt = systemPrompt({ samples: [], maxChars: 160, mode: 'addressed', followUp: false });
+  assert.ok(!/продолжение ветки/i.test(prompt));
+});
+
+test('признак продолжения доходит от ответчика до промпта', async () => {
+  const seen = [];
+  const responder = createResponder({
+    createMessage: async (req) => {
+      seen.push(req);
+      return answer({ reply: false, text: '' });
+    },
+    samples: [],
+  });
+  await responder.compose({ window: WINDOW, trigger: null, mode: 'addressed', followUp: true });
+  assert.match(seen[0].system, /продолжение/i);
+});

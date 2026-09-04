@@ -67,4 +67,4 @@ function decideSpontaneous({
   return { allow: true, why: 'можно' };
 }
 
-module.exports = { isAddressed, inQuietHours, decideAddressed, decideSpontaneous };
+module.exports = { isAddressed, mentionsAlias, inQuietHours, decideAddressed, decideSpontaneous };

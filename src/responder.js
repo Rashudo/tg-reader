@@ -52,6 +52,17 @@ function gradedBlock({ liked = [], disliked = [] } = {}) {
   ].join('\n');
 }
 
+function followUpBlock(followUp) {
+  if (!followUp) return '';
+  return [
+    '',
+    'Это продолжение ветки, где ты уже отвечал. Второй раз подряд отвечать стоит,',
+    'только если тебя спросили о чём-то новом или сказали то, на что молчать странно.',
+    'Согласие, смешок, «ага», «понял», подхваченная шутка — это не повод: верни reply: false.',
+    '',
+  ].join('\n');
+}
+
 function systemPrompt({
   samples = [],
   maxChars = DEFAULT_MAX_CHARS,
@@ -59,6 +70,7 @@ function systemPrompt({
   name = 'Стас',
   avoid = [],
   graded = {},
+  followUp = false,
 }) {
   const task =
     mode === 'addressed'
@@ -78,6 +90,7 @@ function systemPrompt({
     'Твои прошлые сообщения в переписке подписаны «ты».',
     '',
     ...task,
+    followUpBlock(followUp),
     voiceBlock(samples),
     gradedBlock(graded),
     avoidBlock(avoid),
@@ -125,11 +138,11 @@ function createResponder({
   log = console.log,
 }) {
   return {
-    async compose({ window, trigger, mode, avoid = [], graded = {} }) {
+    async compose({ window, trigger, mode, avoid = [], graded = {}, followUp = false }) {
       const response = await createMessage({
         model,
         max_tokens: MAX_TOKENS,
-        system: systemPrompt({ samples, maxChars, mode, name, avoid, graded }),
+        system: systemPrompt({ samples, maxChars, mode, name, avoid, graded, followUp }),
         messages: [{ role: 'user', content: buildUserMessage({ window, trigger }) }],
         output_config: { format: { type: 'json_schema', schema: SCHEMA } },
       });
@@ -166,4 +179,4 @@ function createResponder({
   };
 }
 
-module.exports = { createResponder, systemPrompt, clampText, gradedBlock, SCHEMA };
+module.exports = { createResponder, systemPrompt, clampText, gradedBlock, followUpBlock, SCHEMA };
