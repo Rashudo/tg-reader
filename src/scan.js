@@ -18,9 +18,13 @@ function parseLimit(raw) {
 }
 
 (async () => {
-  const setup = readSetup(KEYWORDS.length, false);
+  const setup = readSetup(KEYWORDS.length);
   if (setup.error) {
     console.error(setup.error);
+    process.exit(1);
+  }
+  if (!setup.features.forwarding.on) {
+    console.error(`Сканировать нечего: ${setup.features.forwarding.why}`);
     process.exit(1);
   }
   const limit = parseLimit(process.argv[2]);

@@ -480,8 +480,8 @@ Expected: PASS, 6 из 6
 `git mv src/config.test.js src/platform/env-pause.test.js`, заменить `require('./env')` на `require('./config')`.
 Удалить `src/env.js`: `git rm src/env.js`.
 
-Run: `cd /root/tg-reader-refactor && node --test src/platform/`
-Expected: PASS, 6 + 8 + 5 = 19 тестов
+Run: `cd /root/tg-reader-refactor && node --test 'src/platform/*.test.js'`
+Expected: PASS, 20 тестов (6 loadConfig + 9 env + 5 пауз)
 
 Если что-то ещё требует `./env` — `grep -rn "require('./env')" src bin` должен молчать.
 
@@ -2963,7 +2963,7 @@ git mv src/repetition.test.js src/features/replies/repetition.test.js
 
 В тестах поправить только пути импорта. Ни одно утверждение не трогать.
 
-Run: `cd /root/tg-reader-refactor && node --test src/features/replies/`
+Run: `cd /root/tg-reader-refactor && node --test 'src/features/replies/*.test.js'`
 Expected: PASS, 28 из 28 (20 правил + 8 повторов)
 
 - [ ] **Шаг 2: свести Bot API в один порт**
@@ -3072,7 +3072,7 @@ Expected: PASS — все три сегодняшних нарушения сн�
 
 - [ ] **Шаг 8: прогнать всё и сверить, что тестов автоответов не убыло**
 
-Run: `cd /root/tg-reader-refactor && node --test src/features/replies/ 2>&1 | grep -E "^# (tests|pass|fail)"`
+Run: `cd /root/tg-reader-refactor && node --test 'src/features/replies/*.test.js' 2>&1 | grep -E "^# (tests|pass|fail)"`
 Expected: не меньше 110 тестов, `# fail 0`
 
 Run: `cd /root/tg-reader-refactor && npm test 2>&1 | tail -6`

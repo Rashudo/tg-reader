@@ -312,7 +312,7 @@ async function startReplies() {
 }
 
 async function main() {
-  const setup = readSetup(KEYWORDS.length, news.isConfigured(), Boolean(config.replies.chat));
+  const setup = readSetup(KEYWORDS.length);
   if (setup.error) {
     console.error(setup.error);
     process.exit(1);
@@ -334,11 +334,11 @@ async function main() {
   }
 
   state.setStartedAt(startedAt);
-  state.setForwarding(setup.forwarding);
+  state.setForwarding(setup.features.forwarding.on);
   process.on('SIGINT', () => shutdown(0));
   process.on('SIGTERM', () => shutdown(0));
 
-  if (setup.forwarding) {
+  if (setup.features.forwarding.on) {
     await startForwarding();
   } else {
     log('Пересылка объявлений выключена');

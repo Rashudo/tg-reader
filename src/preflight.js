@@ -1,44 +1,16 @@
 const { config } = require('./config');
+const { serviceSetup } = require('./platform/config');
 
-function checkSetup({ session, channels, keywordsCount, newsConfigured, repliesConfigured = false, repliesEnabled = true }) {
-  const answer = {
-    error: null,
-    warning: null,
-    forwarding: channels.length > 0,
-    news: newsConfigured,
-    replies: repliesConfigured && repliesEnabled !== false,
-  };
-
-  if (!session) {
-    answer.error = 'Нет TG_SESSION. Сначала выполните: npm run login';
-    return answer;
-  }
-
-  if (answer.forwarding && keywordsCount === 0) {
-    answer.forwarding = false;
-    const trouble = 'Ни одного включённого ключевого слова: keywords.js пуст или все группы в DISABLED_GROUPS';
-    const alive = [newsConfigured && 'сводка новостей', repliesConfigured && 'автоответы'].filter(Boolean);
-    if (alive.length) answer.warning = `${trouble}. Пересылку объявлений пропускаю, ${alive.join(' и ')} работают`;
-    else answer.error = trouble;
-    return answer;
-  }
-
-  if (!answer.forwarding && !newsConfigured && !repliesConfigured) {
-    answer.error =
-      'Нечего делать: не задан ни CHANNEL для объявлений, ни NEWS_CHANNELS для сводки, ни REPLY_CHAT для ответов — см. .env.example';
-  }
-  return answer;
-}
-
-function readSetup(keywordsCount, newsConfigured, repliesConfigured = false) {
-  return checkSetup({
+function readSetup(keywordsCount) {
+  return serviceSetup({
     session: config.session,
     channels: config.channels,
     keywordsCount,
-    newsConfigured,
-    repliesConfigured,
+    anthropicKey: config.anthropicKey,
+    newsChannels: config.news.channels,
+    repliesChat: config.replies.chat,
     repliesEnabled: config.replies.enabled,
   });
 }
 
-module.exports = { checkSetup, readSetup };
+module.exports = { readSetup };

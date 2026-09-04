@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { numFromEnv, hourOrOff } = require('./env');
+const { numFromEnv, hourOrOff } = require('./config');
 
 test('число из строки читается', () => {
   assert.strictEqual(numFromEnv('30', 15), 30);
@@ -26,7 +26,7 @@ test('отрицательные и дробные значения отверг
   assert.strictEqual(numFromEnv('1.5', 15), 15);
 });
 
-const { listFromEnv } = require('./env');
+const { listFromEnv } = require('./config');
 
 test('список через запятую разбирается, пробелы обрезаются', () => {
   assert.deepStrictEqual(listFromEnv(' Телевизоры , Клавишные '), ['Телевизоры', 'Клавишные']);

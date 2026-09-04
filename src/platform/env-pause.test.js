@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { pauseMsFrom } = require('./env');
+const { pauseMsFrom } = require('./config');
 
 test('пауза берётся из секунд, когда они заданы', () => {
   assert.strictEqual(pauseMsFrom('30', undefined, 5), 30000);
