@@ -113,6 +113,7 @@ async function startForwarding() {
   createStallWatchdog({
     lastMessageAt: () => Math.max(state.lastMessageAt() || 0, startedAt),
     probe: channelHasNewsForUs,
+    onQuiet: (at) => state.setProbeOkAt(at),
     onReconnect: () => {
       forceReconnect().catch((err) => log(`Переподключение не удалось: ${err.message}`));
     },

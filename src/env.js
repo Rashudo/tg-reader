@@ -6,6 +6,14 @@ function numFromEnv(raw, fallback) {
   return value;
 }
 
+function hourOrOff(raw) {
+  const text = (raw === undefined || raw === null ? '' : String(raw)).trim().toLowerCase();
+  if (text === '' || text === 'off' || text === 'нет') return null;
+  const value = Number(text);
+  if (!Number.isInteger(value) || value < 0 || value > 23) return null;
+  return value;
+}
+
 function listFromEnv(raw) {
   return String(raw === undefined || raw === null ? '' : raw)
     .split(',')
@@ -13,4 +21,4 @@ function listFromEnv(raw) {
     .filter(Boolean);
 }
 
-module.exports = { numFromEnv, listFromEnv };
+module.exports = { numFromEnv, hourOrOff, listFromEnv };

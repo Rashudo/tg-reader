@@ -125,6 +125,14 @@ function createState(file = STATE_PATH) {
       service = { ...service, forwarding: Boolean(on) };
       schedule();
     },
+    probeOkAt() {
+      return Number.isInteger(service.probeOkAt) ? service.probeOkAt : null;
+    },
+    setProbeOkAt(at) {
+      if (!Number.isInteger(at)) return;
+      service = { ...service, probeOkAt: at };
+      schedule();
+    },
     startedAt() {
       return Number.isInteger(service.startedAt) ? service.startedAt : null;
     },

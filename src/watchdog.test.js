@@ -204,3 +204,20 @@ test('без проверки поведение прежнее — по мол�
   await s.watchdog.tick();
   assert.strictEqual(s.events.gaveUp, 1);
 });
+
+test('подтверждённая тишина сообщается наружу, чтоб её увидела внешняя проверка', async () => {
+  const quiet = [];
+  const dog = createStallWatchdog({
+    lastMessageAt: () => 0,
+    probe: async () => false,
+    onQuiet: (at) => quiet.push(at),
+    onReconnect: () => {},
+    onGiveUp: () => {},
+    log: () => {},
+    reconnectAfterMs: 30 * 60 * 1000,
+    giveUpAfterMs: 45 * 60 * 1000,
+    now: () => 60 * 60 * 1000,
+  });
+  await dog.tick();
+  assert.deepStrictEqual(quiet, [60 * 60 * 1000]);
+});
