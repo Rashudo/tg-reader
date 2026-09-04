@@ -287,3 +287,25 @@ test('память о сказанном не растёт бесконечно'
   assert.strictEqual(kept.length, 8);
   assert.strictEqual(kept.at(-1), 'реплика 19');
 });
+
+test('сброс обнуляет счётчики, но не трогает память о сказанном', () => {
+  const s = createState(tmpFile());
+  s.noteReply('addressed', 1000, '2026-09-04');
+  s.noteSaid('была такая реплика');
+  s.noteAnswered(7);
+  s.resetReplyCounters();
+  const counters = s.replyCounters('2026-09-04');
+  assert.strictEqual(counters.addressed, 0);
+  assert.strictEqual(counters.lastAddressedAt, 0);
+  assert.deepStrictEqual(s.recentReplies(), ['была такая реплика']);
+  assert.strictEqual(s.wasAnswered(7), true);
+});
+
+test('сброс переживает перезапуск', () => {
+  const file = tmpFile();
+  const first = createState(file);
+  first.noteReply('spontaneous', 1000, '2026-09-04');
+  first.resetReplyCounters();
+  first.flush();
+  assert.strictEqual(createState(file).replyCounters('2026-09-04').spontaneous, 0);
+});

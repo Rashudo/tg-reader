@@ -38,6 +38,7 @@ function commandOf(text) {
   if (['стоп', 'stop', 'молчи'].includes(cleaned)) return 'off';
   if (['старт', 'start', 'говори'].includes(cleaned)) return 'on';
   if (['статус', 'status'].includes(cleaned)) return 'status';
+  if (['сброс', 'reset', 'обнули'].includes(cleaned)) return 'reset';
   return null;
 }
 
@@ -74,6 +75,12 @@ function createBotCommands({
       state.setRepliesEnabled(true);
       log('Ответчик: включён командой из бота');
       await say('Снова отвечаю.');
+      return;
+    }
+    if (command === 'reset') {
+      state.resetReplyCounters();
+      log('Ответчик: счётчики за сутки обнулены командой из бота');
+      await say(`Счётчики обнулены. ${await statusText()}`);
       return;
     }
     await say(await statusText());

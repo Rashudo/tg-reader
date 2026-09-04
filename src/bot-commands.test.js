@@ -111,3 +111,37 @@ test('без токена опрос не делается', async () => {
   await bot.poll();
   assert.strictEqual(calls.length, 0);
 });
+
+test('«сброс» обнуляет счётчики за сутки', async () => {
+  let reset = 0;
+  const state = fakeState();
+  state.resetReplyCounters = () => {
+    reset += 1;
+  };
+  const { bot, calls } = rig([{ update_id: 11, message: { text: 'сброс', chat: { id: 7 } } }], { state });
+  await bot.poll();
+  assert.strictEqual(reset, 1);
+  assert.match(calls.at(-1).body.text, /обнул/i);
+});
+
+test('/reset делает то же самое', async () => {
+  let reset = 0;
+  const state = fakeState();
+  state.resetReplyCounters = () => {
+    reset += 1;
+  };
+  const { bot } = rig([{ update_id: 12, message: { text: '/reset', chat: { id: 7 } } }], { state });
+  await bot.poll();
+  assert.strictEqual(reset, 1);
+});
+
+test('сброс из чужого чата не проходит', async () => {
+  let reset = 0;
+  const state = fakeState();
+  state.resetReplyCounters = () => {
+    reset += 1;
+  };
+  const { bot } = rig([{ update_id: 13, message: { text: 'сброс', chat: { id: 999 } } }], { state });
+  await bot.poll();
+  assert.strictEqual(reset, 0);
+});

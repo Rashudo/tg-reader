@@ -204,6 +204,10 @@ function createState(file = STATE_PATH) {
       replies = { ...replies, answered };
       schedule();
     },
+    resetReplyCounters() {
+      replies = { ...replies, addressed: 0, spontaneous: 0, lastAddressedAt: 0, lastSpontaneousAt: 0 };
+      schedule();
+    },
     recentReplies() {
       return [...replies.said];
     },
