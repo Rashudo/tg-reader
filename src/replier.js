@@ -1,4 +1,5 @@
 const { isAddressed, decideAddressed, decideSpontaneous } = require('./reply-rules');
+const { repeatsRecent } = require('./repetition');
 const { localDayOf } = require('./schedule');
 
 const OFF_BUTTON = [[{ text: 'Больше не отвечать', data: 'replies:off' }]];
@@ -18,12 +19,14 @@ function createReplier({
   ownerCancel = 'answer',
   ownerAnswerMs = 60 * 1000,
   staleAfterMs = 10 * 60 * 1000,
+  echoMemory = 6,
 }) {
   const window = [];
   const byId = new Map();
   const queue = [];
   let ownerSpokeAt = null;
   let freshCount = 0;
+  const said = [];
 
   function remember(msg) {
     if (byId.has(msg.id)) return;
@@ -60,11 +63,19 @@ function createReplier({
       return false;
     }
 
+    if (repeatsRecent(composed.text, said)) {
+      log(`Ответчик: повтор недавней шутки — молчу («${composed.text}»)`);
+      return false;
+    }
+
     const posted = await client.sendMessage(chat, {
       message: composed.text,
       ...(composed.replyToId ? { replyTo: composed.replyToId } : {}),
       parseMode: false,
     });
+
+    said.push(composed.text);
+    if (said.length > echoMemory) said.shift();
 
     if (posted && Number.isInteger(posted.id)) {
       remember({

@@ -53,3 +53,8 @@ test('пустые ключевые слова не мешают автоотв�
   assert.strictEqual(setup.error, null);
   assert.match(setup.warning, /автоответы/i);
 });
+
+test('REPLY_ENABLED=off глушит ответы даже при заданном чате', () => {
+  const setup = checkSetup({ session: 'x', channels: ['a'], keywordsCount: 1, newsConfigured: false, repliesConfigured: true, repliesEnabled: false });
+  assert.strictEqual(setup.replies, false);
+});

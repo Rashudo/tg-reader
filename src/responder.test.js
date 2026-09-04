@@ -157,3 +157,9 @@ test('свои сообщения в окне подписаны «ты», а н
   assert.match(content, /\[1\] ты: сейчас гляну/);
   assert.match(content, /\[2\] Тимур: ну как\?/);
 });
+
+test('промпт запрещает подхватывать одну и ту же шутку', () => {
+  const prompt = systemPrompt({ samples: [], maxChars: 160, mode: 'addressed', name: 'Стас' });
+  assert.match(prompt, /не повторяй/i);
+  assert.match(prompt, /шутк/i);
+});

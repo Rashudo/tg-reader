@@ -402,3 +402,39 @@ test('история без текста в окно не идёт', async () =>
   replier.seed([{ id: 5, from: ME, author: 'Стас', replyTo: null, text: '' }]);
   assert.strictEqual(replier.window().length, 0);
 });
+
+test('повтор собственной шутки не отправляется', async () => {
+  let text = 'только на рот парня';
+  const { replier, sent, clock, logs } = rig({
+    responder: { compose: async () => ({ reply: true, text, replyToId: 11 }) },
+  });
+  await replier.onMessage(MINE);
+  await replier.onMessage(ASK);
+  clock.advance(5 * MIN);
+  await replier.flush();
+  assert.strictEqual(sent.length, 1);
+
+  text = 'тесто, сахар и твой рот парня для замеса';
+  await replier.onMessage({ id: 20, from: 'other', author: 'Женя', replyTo: 10, text: 'а рецепт?' });
+  clock.advance(5 * MIN);
+  await replier.flush();
+  assert.strictEqual(sent.length, 1);
+  assert.ok(logs.some((line) => /повтор/i.test(line)));
+});
+
+test('новая мысль после повтора проходит', async () => {
+  let text = 'только на рот парня';
+  const { replier, sent, clock } = rig({
+    responder: { compose: async () => ({ reply: true, text, replyToId: 11 }) },
+  });
+  await replier.onMessage(MINE);
+  await replier.onMessage(ASK);
+  clock.advance(5 * MIN);
+  await replier.flush();
+
+  text = 'бери противень поменьше, иначе не пропечётся';
+  await replier.onMessage({ id: 20, from: 'other', author: 'Женя', replyTo: 10, text: 'а рецепт?' });
+  clock.advance(5 * MIN);
+  await replier.flush();
+  assert.strictEqual(sent.length, 2);
+});

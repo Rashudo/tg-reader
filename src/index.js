@@ -205,6 +205,10 @@ async function startReplies() {
     log('Автоответы выключены: нет ANTHROPIC_API_KEY');
     return;
   }
+  if (!config.replies.enabled) {
+    log('Автоответы выключены: REPLY_ENABLED=off');
+    return;
+  }
 
   let chat;
   try {

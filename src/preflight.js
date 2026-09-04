@@ -1,12 +1,12 @@
 const { config } = require('./config');
 
-function checkSetup({ session, channels, keywordsCount, newsConfigured, repliesConfigured = false }) {
+function checkSetup({ session, channels, keywordsCount, newsConfigured, repliesConfigured = false, repliesEnabled = true }) {
   const answer = {
     error: null,
     warning: null,
     forwarding: channels.length > 0,
     news: newsConfigured,
-    replies: repliesConfigured,
+    replies: repliesConfigured && repliesEnabled !== false,
   };
 
   if (!session) {
@@ -37,6 +37,7 @@ function readSetup(keywordsCount, newsConfigured, repliesConfigured = false) {
     keywordsCount,
     newsConfigured,
     repliesConfigured,
+    repliesEnabled: config.replies.enabled,
   });
 }
 
