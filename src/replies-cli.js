@@ -84,8 +84,8 @@ function memoryState() {
     limits: {
       dailyBudget: config.replies.dailyBudget,
       addressedBudget: config.replies.addressedBudget,
-      spontaneousPauseMs: config.replies.spontaneousPauseMin * 60 * 1000,
-      addressedPauseMs: config.replies.addressedPauseMin * 60 * 1000,
+      spontaneousPauseMs: config.replies.spontaneousPauseMs,
+      addressedPauseMs: config.replies.addressedPauseMs,
       delayMinMs: config.replies.delayMinSec * 1000,
       delayMaxMs: config.replies.delayMaxSec * 1000,
       quiet: { from: config.replies.quietFrom, to: config.replies.quietTo, timeZone: config.replies.timeZone },

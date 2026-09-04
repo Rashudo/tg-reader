@@ -14,6 +14,12 @@ function hourOrOff(raw) {
   return value;
 }
 
+function pauseMsFrom(rawSeconds, rawMinutes, fallbackMinutes) {
+  const seconds = numFromEnv(rawSeconds, null);
+  if (seconds !== null) return seconds * 1000;
+  return numFromEnv(rawMinutes, fallbackMinutes) * 60 * 1000;
+}
+
 function listFromEnv(raw) {
   return String(raw === undefined || raw === null ? '' : raw)
     .split(',')
@@ -21,4 +27,4 @@ function listFromEnv(raw) {
     .filter(Boolean);
 }
 
-module.exports = { numFromEnv, hourOrOff, listFromEnv };
+module.exports = { numFromEnv, hourOrOff, pauseMsFrom, listFromEnv };

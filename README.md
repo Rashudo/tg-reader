@@ -289,9 +289,9 @@ systemctl start tg-reader
 | Что | По умолчанию | Переменная |
 |---|---|---|
 | Реплик по своей воле в сутки | 4 | `REPLY_DAILY_BUDGET` |
-| Пауза между ними | 90 мин | `REPLY_SPONTANEOUS_PAUSE_MIN` |
+| Пауза между ними | 90 мин | `REPLY_SPONTANEOUS_PAUSE_MIN`, короче — `REPLY_SPONTANEOUS_PAUSE_SEC` |
 | Ответов на обращения в сутки | 10 | `REPLY_ADDRESSED_BUDGET` |
-| Пауза между ними | 5 мин | `REPLY_ADDRESSED_PAUSE_MIN` |
+| Пауза между ними | 5 мин | `REPLY_ADDRESSED_PAUSE_MIN`, короче — `REPLY_ADDRESSED_PAUSE_SEC` |
 | Задержка перед отправкой | 2–4 мин | `REPLY_DELAY_MIN_SEC` / `REPLY_DELAY_MAX_SEC` |
 | Тихие часы | 23:00–09:00 | `REPLY_QUIET_FROM` / `REPLY_QUIET_TO` |
 | Длина реплики | 160 символов | `REPLY_MAX_CHARS` |

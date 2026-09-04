@@ -1,7 +1,7 @@
 const path = require('path');
 
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
-const { numFromEnv, hourOrOff, listFromEnv } = require('./env');
+const { numFromEnv, hourOrOff, pauseMsFrom, listFromEnv } = require('./env');
 
 function required(name) {
   const value = (process.env[name] || '').trim();
@@ -44,8 +44,12 @@ const config = {
     aliases: listFromEnv(process.env.REPLY_ALIASES),
     dailyBudget: numFromEnv(process.env.REPLY_DAILY_BUDGET, 4),
     addressedBudget: numFromEnv(process.env.REPLY_ADDRESSED_BUDGET, 10),
-    spontaneousPauseMin: numFromEnv(process.env.REPLY_SPONTANEOUS_PAUSE_MIN, 90),
-    addressedPauseMin: numFromEnv(process.env.REPLY_ADDRESSED_PAUSE_MIN, 5),
+    spontaneousPauseMs: pauseMsFrom(
+      process.env.REPLY_SPONTANEOUS_PAUSE_SEC,
+      process.env.REPLY_SPONTANEOUS_PAUSE_MIN,
+      90
+    ),
+    addressedPauseMs: pauseMsFrom(process.env.REPLY_ADDRESSED_PAUSE_SEC, process.env.REPLY_ADDRESSED_PAUSE_MIN, 5),
     delayMinSec: numFromEnv(process.env.REPLY_DELAY_MIN_SEC, 120),
     delayMaxSec: numFromEnv(process.env.REPLY_DELAY_MAX_SEC, 240),
     quietFrom: numFromEnv(process.env.REPLY_QUIET_FROM, 23),
