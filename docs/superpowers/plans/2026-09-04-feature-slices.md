@@ -1677,17 +1677,21 @@ const { createClock } = require('./platform/clock');
   gateway = createGateway({ client, clock, log });
 ```
 
-Две подписки `client.addEventHandler(onEvent, new NewMessage({}))` / `EditedMessage` (строки 109-110) заменить на одну:
+Перевести `index.js` на `gateway.onPost` здесь нельзя: `forwarder.handle` и `replier.onMessage` до задач 5 и 7 принимают объекты gramjs (`msg.message`, `msg.groupedId`), а шлюз отдаёт `Post` (`post.text`, `post.groupId`). Переучивать их сейчас значило бы делать чужую задачу наполовину.
+
+Поэтому здесь ставится переходный шов: выбор типов событий — дело адаптера, а не точки входа. В `gateway.js` добавляется
 
 ```js
-  gateway.onPost((posts) => {
-    onPosts(posts).catch((err) => log(`Ошибка обработки сообщения: ${err.message}`));
-  });
+function subscribeMessages(client, handler, { edits = false } = {}) {
+  client.addEventHandler(handler, new NewMessage({}));
+  if (edits) client.addEventHandler(handler, new EditedMessage({}));
+  return () => client.removeEventHandler(handler);
+}
 ```
 
-где `onPosts` — обёртка, вызывающая `forwarder.handle(source, posts)` для известного `posts[0].chatKey`. Подписку автоответов (`index.js:285-290`) заменить на второй `gateway.onPost` с фильтром по `chatKey` чата ответов, а `chatMessageOf` (`index.js:186-197`) удалить целиком: шлюз уже отдаёт `Post` с `from`, `author` и `replyTo`.
+и сам `createGateway` подписывается через неё же. В `index.js` обе пары `client.addEventHandler(..., new NewMessage({}))` заменяются на `subscribeMessages(client, ..., { edits: true })` и `subscribeMessages(client, ...)`.
 
-Полная развязка `index.js` — задача 9. Здесь достаточно, чтобы прямых импортов gramjs в нём не осталось и правило 6 стало зелёным.
+`chatMessageOf` (`index.js:186-197`) остаётся до задачи 7, где ответчик переезжает на `Post` и функция исчезает вместе с `subscribeMessages`. Здесь достаточно, чтобы прямых импортов gramjs в `index.js` не осталось и правило 6 стало зелёным.
 
 - [ ] **Шаг 16: прогнать всё**
 
