@@ -10,6 +10,10 @@ const { withTimeout } = require('./async');
 const { createWatchdog, createStallWatchdog } = require('./watchdog');
 const { createNotifier } = require('./notify');
 const { createForwarder } = require('./forwarder');
+const { createReplier } = require('./replier');
+const { createResponder } = require('./responder');
+const { createBotCommands } = require('./bot-commands');
+const { loadVoice } = require('./voice');
 const news = require('./news');
 const keywords = require('../keywords');
 
@@ -20,6 +24,9 @@ const PROBE_TIMEOUT_MS = 30 * 1000;
 const OFFLINE_LIMIT_MS = 5 * 60 * 1000;
 const WATCHDOG_INTERVAL_MS = 30 * 1000;
 const DIGEST_CHECK_INTERVAL_MS = 10 * 60 * 1000;
+const REPLY_FLUSH_INTERVAL_MS = 30 * 1000;
+const REPLY_TICK_INTERVAL_MS = 25 * 60 * 1000;
+const BOT_POLL_INTERVAL_MS = 30 * 1000;
 const STALL_RECONNECT_MS = config.health.stallReconnectMin * 60 * 1000;
 const STALL_GIVEUP_MS = config.health.stallGiveUpMin * 60 * 1000;
 
@@ -176,8 +183,114 @@ async function startNewsDigest() {
   );
 }
 
+function chatMessageOf(event, names) {
+  const msg = event.message;
+  if (!msg) return null;
+  const from = msg.senderId ? String(msg.senderId) : null;
+  return {
+    id: msg.id,
+    from,
+    author: (from && names.get(from)) || 'кто-то',
+    replyTo: msg.replyTo ? msg.replyTo.replyToMsgId : null,
+    text: msg.message || '',
+  };
+}
+
+async function startReplies() {
+  if (!config.replies.chat) {
+    log('Автоответы выключены: REPLY_CHAT не задан');
+    return;
+  }
+  if (!config.anthropicKey) {
+    log('Автоответы выключены: нет ANTHROPIC_API_KEY');
+    return;
+  }
+
+  let chat;
+  try {
+    chat = await client.getEntity(config.replies.chat);
+  } catch (err) {
+    log(`Автоответы выключены: не удалось открыть чат "${config.replies.chat}" (${err.message})`);
+    return;
+  }
+
+  const me = await client.getMe();
+  const names = new Map();
+  try {
+    for (const person of await client.getParticipants(chat)) {
+      names.set(String(person.id), person.firstName || person.username || String(person.id));
+    }
+  } catch (err) {
+    log(`Имена участников чата не прочитались (${err.message}) — обойдусь без них`);
+  }
+
+  const voice = loadVoice();
+  if (voice.samples.length === 0) {
+    log('Автоответы: образцов речи нет, ответы будут безликими — соберите voice.json');
+  }
+
+  const replier = createReplier({
+    client,
+    chat,
+    state,
+    responder: createResponder({
+      model: config.replies.model,
+      createMessage: news.createAnthropicCall(config.anthropicKey),
+      samples: voice.samples,
+      maxChars: config.replies.maxChars,
+      log,
+    }),
+    notifier,
+    meId: String(me.id),
+    aliases: config.replies.aliases,
+    limits: {
+      dailyBudget: config.replies.dailyBudget,
+      addressedBudget: config.replies.addressedBudget,
+      spontaneousPauseMs: config.replies.spontaneousPauseMin * 60 * 1000,
+      addressedPauseMs: config.replies.addressedPauseMin * 60 * 1000,
+      delayMinMs: config.replies.delayMinSec * 1000,
+      delayMaxMs: config.replies.delayMaxSec * 1000,
+      quiet: { from: config.replies.quietFrom, to: config.replies.quietTo, timeZone: config.replies.timeZone },
+      context: config.replies.context,
+      minFresh: config.replies.minFresh,
+      ownerSilenceMs: config.replies.ownerSilenceMin * 60 * 1000,
+    },
+    ownerCancel: config.replies.ownerCancel,
+    log,
+  });
+
+  const chatKey = peerKey(chat);
+  client.addEventHandler((event) => {
+    if (eventPeerKey(event) !== chatKey) return;
+    const msg = chatMessageOf(event, names);
+    if (!msg) return;
+    replier.onMessage(msg).catch((err) => log(`Ответчик споткнулся на сообщении: ${err.message}`));
+  }, new NewMessage({}));
+
+  setInterval(() => {
+    replier.flush().catch((err) => log(`Ответчик: очередь не разобралась (${err.message})`));
+  }, REPLY_FLUSH_INTERVAL_MS);
+
+  setInterval(() => {
+    replier.tick().catch((err) => log(`Ответчик: проверка не удалась (${err.message})`));
+  }, REPLY_TICK_INTERVAL_MS);
+
+  createBotCommands({
+    token: config.alert.token,
+    chatId: config.alert.chatId,
+    state,
+    timeZone: config.replies.timeZone,
+    log,
+  }).start(BOT_POLL_INTERVAL_MS);
+
+  log(
+    `Автоответы: чат «${chat.title || config.replies.chat}», ${state.repliesEnabled() ? 'включены' : 'выключены'}, ` +
+      `образцов речи ${voice.samples.length}, модель ${config.replies.model}`
+  );
+}
+
 async function main() {
-  const setup = readSetup(KEYWORDS.length, news.isConfigured());
+  const setup = readSetup(KEYWORDS.length, news.isConfigured(), Boolean(config.replies.chat));
   if (setup.error) {
     console.error(setup.error);
     process.exit(1);
@@ -210,6 +323,7 @@ async function main() {
   }
 
   await startNewsDigest();
+  await startReplies();
 
   createWatchdog({
     isConnected: () => Boolean(client.connected),

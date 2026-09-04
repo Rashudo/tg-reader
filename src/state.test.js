@@ -225,3 +225,48 @@ test('момент подтверждённой тишины переживае�
   first.flush();
   assert.strictEqual(createState(file).probeOkAt(), 1700000000000);
 });
+
+test('выключённые ответы переживают перезапуск', () => {
+  const file = tmpFile();
+  const first = createState(file);
+  first.setRepliesEnabled(false);
+  first.flush();
+  assert.strictEqual(createState(file).repliesEnabled(), false);
+});
+
+test('по умолчанию ответы включены', () => {
+  assert.strictEqual(createState(tmpFile()).repliesEnabled(), true);
+});
+
+test('счётчики ответов обнуляются со сменой суток', () => {
+  const s = createState(tmpFile());
+  s.noteReply('spontaneous', 1000, '2026-09-04');
+  s.noteReply('addressed', 1000, '2026-09-04');
+  assert.strictEqual(s.replyCounters('2026-09-04').spontaneous, 1);
+  assert.strictEqual(s.replyCounters('2026-09-04').addressed, 1);
+  assert.strictEqual(s.replyCounters('2026-09-05').spontaneous, 0);
+});
+
+test('момент последнего ответа виден по видам отдельно', () => {
+  const s = createState(tmpFile());
+  s.noteReply('spontaneous', 5000, '2026-09-04');
+  assert.strictEqual(s.replyCounters('2026-09-04').lastSpontaneousAt, 5000);
+  assert.strictEqual(s.replyCounters('2026-09-04').lastAddressedAt, 0);
+});
+
+test('на одно сообщение отвечаем один раз даже после перезапуска', () => {
+  const file = tmpFile();
+  const s = createState(file);
+  s.noteAnswered(42);
+  s.flush();
+  assert.strictEqual(createState(file).wasAnswered(42), true);
+  assert.strictEqual(createState(file).wasAnswered(43), false);
+});
+
+test('смещение бота хранится между запусками', () => {
+  const file = tmpFile();
+  const s = createState(file);
+  s.setBotOffset(17);
+  s.flush();
+  assert.strictEqual(createState(file).botOffset(), 17);
+});

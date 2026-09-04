@@ -5,6 +5,7 @@ const PRICES = {
   'claude-haiku-4-5': { input: 1, output: 5 },
   'claude-sonnet-5': { input: 2, output: 10 },
   'claude-opus-5': { input: 5, output: 25 },
+  'claude-opus-4-8': { input: 5, output: 25 },
 };
 
 const SCHEMA = {
