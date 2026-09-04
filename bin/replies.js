@@ -1,13 +1,17 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { config } = require('./config');
-const { createRepliesJob } = require('./features/replies/job');
-const { createRepliesStore } = require('./features/replies/store');
-const { samplesOf } = require('./features/replies/voice');
-const { readJson } = require('./platform/json-file');
-const { openDb } = require('./platform/db/open');
-const { createLlm } = require('./platform/llm/anthropic');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+
+const { loadConfig } = require('../src/platform/config');
+const { createRepliesJob } = require('../src/features/replies/job');
+const { createRepliesStore } = require('../src/features/replies/store');
+const { samplesOf } = require('../src/features/replies/voice');
+const { readJson } = require('../src/platform/json-file');
+const { openDb } = require('../src/platform/db/open');
+const { createLlm } = require('../src/platform/llm/anthropic');
+
+const { config, errors: configErrors } = loadConfig(process.env);
 
 const VOICE_PATH = process.env.TG_VOICE_PATH || path.join(__dirname, '..', 'voice.json');
 
@@ -24,11 +28,15 @@ function scratchStore() {
   return createRepliesStore(openDb(path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'replies-dry-')), 'state.db')));
 }
 
-(async () => {
+async function main() {
+  if (configErrors.length > 0) {
+    console.error(configErrors.join('\n'));
+    return 1;
+  }
   const fileArg = process.argv.indexOf('--from-file');
   if (fileArg === -1) {
     console.error('Использование: npm run replies -- --from-file <выгрузка.json>');
-    process.exit(1);
+    return 1;
   }
 
   const day = JSON.parse(fs.readFileSync(process.argv[fileArg + 1], 'utf8')).sort((a, b) => a.date - b.date);
@@ -134,7 +142,12 @@ function scratchStore() {
   for (const [key, count] of [...reasons.entries()].sort((a, b) => b[1] - a[1])) {
     console.log(`  ${key}: ${count}`);
   }
-})().catch((err) => {
-  console.error('Прогон упал:', err.message);
-  process.exit(1);
-});
+  return 0;
+}
+
+main()
+  .then((code) => process.exit(code))
+  .catch((err) => {
+    console.error('Прогон упал:', err.message);
+    process.exit(1);
+  });

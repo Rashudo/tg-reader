@@ -8,4 +8,10 @@ function readJson(file, fallback) {
   }
 }
 
-module.exports = { readJson };
+function writeJson(file, value) {
+  const tmp = `${file}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(value, null, 2));
+  fs.renameSync(tmp, file);
+}
+
+module.exports = { readJson, writeJson };

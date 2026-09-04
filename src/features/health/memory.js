@@ -1,5 +1,5 @@
-const fs = require('fs');
 const path = require('path');
+const { readJson, writeJson } = require('../../platform/json-file');
 
 const MEMORY_PATH = process.env.TG_ALERT_STATE_PATH || path.join(__dirname, '..', '..', '..', 'alert-state.json');
 
@@ -12,17 +12,11 @@ const EMPTY_MEMORY = {
 };
 
 function loadMemory(file = MEMORY_PATH) {
-  try {
-    return { ...EMPTY_MEMORY, ...JSON.parse(fs.readFileSync(file, 'utf8')) };
-  } catch (err) {
-    return { ...EMPTY_MEMORY };
-  }
+  return { ...EMPTY_MEMORY, ...(readJson(file, null) || {}) };
 }
 
 function saveMemory(memory, file = MEMORY_PATH) {
-  const tmp = `${file}.tmp`;
-  fs.writeFileSync(tmp, JSON.stringify(memory, null, 2));
-  fs.renameSync(tmp, file);
+  writeJson(file, memory);
 }
 
 module.exports = { loadMemory, saveMemory, EMPTY_MEMORY, MEMORY_PATH };

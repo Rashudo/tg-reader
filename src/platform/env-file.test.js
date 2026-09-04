@@ -3,7 +3,7 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { setEnvVar } = require('./envfile');
+const { setEnvVar } = require('./env-file');
 
 function tmpEnv(content) {
   const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'tg-env-')), '.env');

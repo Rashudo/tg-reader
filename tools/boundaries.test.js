@@ -80,9 +80,36 @@ test('правило 2: фича не импортирует чужую фичу
   assert.deepStrictEqual(guilty, [], `общее место фич — platform или shared: ${guilty.join(', ')}`);
 });
 
-test.skip('правило 5 (включается в задаче 9): process.exit живёт только в bin', () => {
+test('правило 5: process.exit живёт только в bin', () => {
   const guilty = jsFilesUnder(srcRoot).filter((rel) =>
     hasProcessExit(fs.readFileSync(path.join(srcRoot, rel), 'utf8'))
   );
   assert.deepStrictEqual(guilty, [], `ниже bin положено бросать, а не выходить: ${guilty.join(', ')}`);
+});
+
+const FORBIDDEN_IN_FEATURES = [
+  'telegram', '@anthropic-ai/sdk', 'node:sqlite', 'sqlite',
+  'fs', 'node:fs', 'https', 'node:https', 'child_process', 'node:child_process', 'dotenv',
+];
+
+test('правило 1: фича не знает ни библиотек, ни ввода-вывода', () => {
+  const guilty = [];
+  for (const [file, imports] of importsBySrcFile()) {
+    if (!file.startsWith('features/')) continue;
+    if (file.endsWith('.test.js')) continue;
+    for (const name of imports) {
+      if (FORBIDDEN_IN_FEATURES.includes(name) || name.startsWith('telegram/')) guilty.push(`${file} -> ${name}`);
+    }
+  }
+  assert.deepStrictEqual(guilty, [], `фичам положено ходить только в platform и shared: ${guilty.join(', ')}`);
+});
+
+test('правило 3: платформа не знает про фичи', () => {
+  const guilty = [];
+  for (const [file, imports] of importsBySrcFile()) {
+    if (!file.startsWith('platform/')) continue;
+    if (file.endsWith('.test.js')) continue;
+    if (imports.some((name) => name.includes('features/'))) guilty.push(file);
+  }
+  assert.deepStrictEqual(guilty, [], `платформа смотрит вверх: ${guilty.join(', ')}`);
 });

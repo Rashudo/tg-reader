@@ -6,7 +6,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=/var/www/www-root/data/www/tg-reader
-ExecStart=/usr/bin/node src/index.js
+ExecStart=/usr/bin/node --disable-warning=ExperimentalWarning bin/serve.js
 Restart=always
 RestartSec=10
 StandardOutput=journal

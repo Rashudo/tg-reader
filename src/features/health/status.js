@@ -78,4 +78,29 @@ function readStatus(file) {
   }
 }
 
-module.exports = { createStatusWriter, readStatus, STATUS_CONTRACT };
+function createStatusJob({ writer, snapshot, clock, everyMs = 30 * 1000, log = console.log }) {
+  const timers = [];
+
+  function write() {
+    try {
+      writer.write(snapshot(), clock.now());
+    } catch (err) {
+      log(`Состояние не записалось: ${err.message}`);
+    }
+  }
+
+  return {
+    name: 'status',
+    write,
+    async start() {
+      write();
+      timers.push(clock.every(everyMs, write));
+    },
+    async stop() {
+      for (const cancel of timers) cancel();
+      timers.length = 0;
+    },
+  };
+}
+
+module.exports = { createStatusWriter, createStatusJob, readStatus, STATUS_CONTRACT };

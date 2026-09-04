@@ -5,15 +5,15 @@
   "description": "Читает сообщения публичного Telegram-канала от имени вашего аккаунта и пересылает вам те, что совпали с массивом ключевых слов",
   "main": "src/index.js",
   "scripts": {
-    "login": "node src/login.js",
-    "start": "node src/index.js",
-    "scan": "node src/scan.js",
+    "login": "node bin/login.js",
+    "start": "node --disable-warning=ExperimentalWarning bin/serve.js",
+    "scan": "node --disable-warning=ExperimentalWarning bin/scan.js",
     "health": "node --disable-warning=ExperimentalWarning bin/healthcheck.js",
-    "digest": "node src/digest-cli.js",
-    "alert-setup": "node src/alert-setup.js",
+    "digest": "node --disable-warning=ExperimentalWarning bin/digest.js",
+    "alert-setup": "node bin/alert-setup.js",
     "test": "node --disable-warning=ExperimentalWarning --test",
-    "replies": "node src/replies-cli.js",
-    "voice": "node bin/export-voice.js"
+    "replies": "node --disable-warning=ExperimentalWarning bin/replies.js",
+    "voice": "node --disable-warning=ExperimentalWarning bin/voice.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",

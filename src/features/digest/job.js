@@ -38,9 +38,12 @@ function createDigestJob({
   hour,
   includeLinks,
   clock,
+  checkEveryMs = 10 * 60 * 1000,
   log = console.log,
   notify = async () => {},
 }) {
+  const timers = [];
+  let running = false;
   async function run({ now = clock.now(), dryRun = false } = {}) {
     const parts = [];
 
@@ -84,10 +87,34 @@ function createDigestJob({
     return { parts };
   }
 
+  const isDueNow = (now = clock.now()) =>
+    due({ chats, lastRunAt: (key) => store.lastRunAt(key), now, hour, timeZone });
+
+  async function tick() {
+    if (running || !isDueNow()) return;
+    running = true;
+    try {
+      await run();
+    } catch (err) {
+      log(`Сводка новостей упала: ${err.message}`);
+      await notify(`🟠 tg-reader: сводка новостей упала — ${err.message}`);
+    } finally {
+      running = false;
+    }
+  }
+
   return {
     name: 'digest',
     run,
-    due: (now = clock.now()) => due({ chats, lastRunAt: (key) => store.lastRunAt(key), now, hour, timeZone }),
+    tick,
+    due: isDueNow,
+    async start() {
+      timers.push(clock.every(checkEveryMs, () => tick()));
+    },
+    async stop() {
+      for (const cancel of timers) cancel();
+      timers.length = 0;
+    },
   };
 }
 

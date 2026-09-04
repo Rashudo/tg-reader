@@ -1,10 +1,14 @@
 const https = require('https');
 const path = require('path');
-const { config } = require('./config');
-const { setEnvVar } = require('./envfile');
-const { createNotifier } = require('./platform/notify/telegram-bot');
+
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+
+const { loadConfig } = require('../src/platform/config');
+const { setEnvVar } = require('../src/platform/env-file');
+const { createNotifier } = require('../src/platform/notify/telegram-bot');
 
 const ENV_PATH = path.join(__dirname, '..', '.env');
+const { config } = loadConfig(process.env);
 
 function getJson(url) {
   return new Promise((resolve, reject) => {

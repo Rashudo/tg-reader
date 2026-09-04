@@ -1,15 +1,22 @@
 const fs = require('fs');
-const { config } = require('./config');
-const { serviceSetup } = require('./platform/config');
-const { createClient } = require('./client');
-const { createState } = require('./state');
-const { createGateway } = require('./platform/telegram/gateway');
-const { createClock } = require('./platform/clock');
-const { createLlm } = require('./platform/llm/anthropic');
-const { createDigestJob, resolveChats, summarize } = require('./features/digest/job');
-const { renderDigest } = require('./features/digest/render');
-const { withTimeout } = require('./async');
-const { parseDigestArgs } = require('./cli-args');
+const path = require('path');
+
+require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+
+const { loadConfig, serviceSetup } = require('../src/platform/config');
+const { openDb } = require('../src/platform/db/open');
+const { importLegacyState } = require('../src/platform/db/import-state-json');
+const { createLlm } = require('../src/platform/llm/anthropic');
+const { openTelegram } = require('../src/runtime/boot');
+const { createDigestStore } = require('../src/features/digest/store');
+const { createDigestJob, resolveChats, summarize } = require('../src/features/digest/job');
+const { renderDigest } = require('../src/features/digest/render');
+const { parseDigestArgs } = require('../src/shared/cli-args');
+
+const DB_PATH = process.env.TG_DB_PATH || path.join(__dirname, '..', 'state.db');
+const LEGACY_PATH = process.env.TG_STATE_PATH || path.join(__dirname, '..', 'state.json');
+
+const { config, errors: configErrors } = loadConfig(process.env);
 
 const args = parseDigestArgs(process.argv.slice(2));
 
@@ -28,8 +35,7 @@ async function fromFile(file) {
     .filter((item) => item.text.trim());
 
   if (!config.anthropicKey) {
-    console.error('Не задан ANTHROPIC_API_KEY в .env');
-    process.exit(1);
+    throw new Error('Не задан ANTHROPIC_API_KEY в .env');
   }
 
   console.error('Файловый режим делает один платный вызов модели, Telegram не трогает.');
@@ -49,15 +55,19 @@ async function fromFile(file) {
   console.log(parts.join('\n\n— — —\n\n'));
 }
 
-(async () => {
+async function main() {
+  if (configErrors.length > 0) {
+    console.error(configErrors.join('\n'));
+    return 1;
+  }
   if (args.error) {
     console.error(args.error);
-    process.exit(1);
+    return 1;
   }
 
   if (args.fromFile) {
     await fromFile(args.fromFile);
-    process.exit(0);
+    return 0;
   }
 
   const setup = serviceSetup({
@@ -71,30 +81,24 @@ async function fromFile(file) {
   });
   if (!setup.features.digest.on) {
     console.error(`Сводка не настроена: ${setup.features.digest.why}`);
-    process.exit(1);
+    return 1;
   }
 
-  const client = createClient();
-  if (client.setLogLevel) client.setLogLevel('error');
-  await withTimeout(client.connect(), 60000, 'не удалось подключиться к Telegram за минуту');
+  const telegram = await openTelegram({ config, log });
+  const { gateway, clock } = telegram;
+  const db = openDb(DB_PATH);
+  importLegacyState(db, LEGACY_PATH, { log });
 
-  if (!(await client.isUserAuthorized())) {
-    console.error('Сессия недействительна. Выполните: npm run login');
-    process.exit(1);
-  }
-
-  const clock = createClock();
-  const gateway = createGateway({ client, clock, log });
-  const state = createState();
   const chats = await resolveChats(gateway, config.news.channels, log);
   if (chats.length === 0) {
     console.error('Ни один канал не открылся');
-    process.exit(1);
+    await telegram.close();
+    return 1;
   }
 
   const digest = createDigestJob({
     gateway,
-    store: state,
+    store: createDigestStore(db),
     llm: createLlm({ apiKey: config.anthropicKey, log }),
     chats,
     target: config.news.target,
@@ -111,9 +115,14 @@ async function fromFile(file) {
   const result = await digest.run({ dryRun: args.dryRun });
   if (args.dryRun) console.log(`\n${result.parts.join('\n\n— — —\n\n')}`);
 
-  await client.disconnect();
-  process.exit(0);
-})().catch((err) => {
-  console.error('Сводка не удалась:', err.message);
-  process.exit(1);
-});
+  await telegram.close();
+  db.close();
+  return 0;
+}
+
+main()
+  .then((code) => process.exit(code))
+  .catch((err) => {
+    console.error('Сводка не удалась:', err.message);
+    process.exit(1);
+  });
