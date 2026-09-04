@@ -1,6 +1,6 @@
 const { estimateCost } = require('./summarizer');
 
-const DEFAULT_MODEL = 'claude-haiku-4-5';
+const DEFAULT_MODEL = 'claude-opus-4-8';
 const MAX_TOKENS = 400;
 const DEFAULT_MAX_CHARS = 160;
 

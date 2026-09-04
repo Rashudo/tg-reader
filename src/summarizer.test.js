@@ -90,6 +90,7 @@ test('в лог пишется стоимость прогона', async () => {
 test('стоимость считается по прейскуранту модели', () => {
   assert.strictEqual(estimateCost('claude-haiku-4-5', 1000000, 1000000), 6);
   assert.strictEqual(estimateCost('claude-opus-5', 1000000, 1000000), 30);
+  assert.strictEqual(estimateCost('claude-opus-4-8', 1000000, 1000000), 30);
   assert.strictEqual(estimateCost('неизвестная-модель', 1000000, 1000000), null);
 });
 

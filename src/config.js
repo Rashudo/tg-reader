@@ -40,7 +40,7 @@ const config = {
   replies: {
     chat: (process.env.REPLY_CHAT || '').trim(),
     enabled: (process.env.REPLY_ENABLED || 'on').trim().toLowerCase() !== 'off',
-    model: (process.env.REPLY_MODEL || 'claude-haiku-4-5').trim(),
+    model: (process.env.REPLY_MODEL || 'claude-opus-4-8').trim(),
     aliases: listFromEnv(process.env.REPLY_ALIASES),
     dailyBudget: numFromEnv(process.env.REPLY_DAILY_BUDGET, 4),
     addressedBudget: numFromEnv(process.env.REPLY_ADDRESSED_BUDGET, 10),
