@@ -1,4 +1,4 @@
-const { estimateCost } = require('./summarizer');
+const { estimateCost } = require('./platform/llm/anthropic');
 
 const DEFAULT_MODEL = 'claude-opus-4-8';
 const MAX_TOKENS = 800;

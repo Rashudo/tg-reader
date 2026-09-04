@@ -3,7 +3,7 @@ const { config } = require('./config');
 const { createReplier } = require('./replier');
 const { createResponder } = require('./responder');
 const { loadVoice } = require('./voice');
-const { createAnthropicCall } = require('./news');
+const { anthropicRequest: createAnthropicCall } = require('./platform/llm/anthropic');
 
 const ME = process.env.REPLY_ME_ID || '6307473828';
 const TICK_MS = 25 * 60 * 1000;

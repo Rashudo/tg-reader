@@ -1,12 +1,14 @@
 const fs = require('fs');
 const { config } = require('./config');
+const { serviceSetup } = require('./platform/config');
 const { createClient } = require('./client');
 const { createState } = require('./state');
-const { createSummarizer } = require('./summarizer');
-const { renderDigest } = require('./digest-render');
+const { createGateway } = require('./platform/telegram/gateway');
+const { createClock } = require('./platform/clock');
+const { createLlm } = require('./platform/llm/anthropic');
+const { createDigestJob, resolveChats, summarize } = require('./features/digest/job');
+const { renderDigest } = require('./features/digest/render');
 const { withTimeout } = require('./async');
-const news = require('./news');
-
 const { parseDigestArgs } = require('./cli-args');
 
 const args = parseDigestArgs(process.argv.slice(2));
@@ -17,11 +19,13 @@ function log(...parts) {
 
 async function fromFile(file) {
   const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
-  const items = (Array.isArray(raw) ? raw : raw.items || []).map((item, index) => ({
-    id: item.id || index + 1,
-    text: item.text || item.message || '',
-    ...(config.news.links && item.link ? { link: item.link } : {}),
-  })).filter((item) => item.text.trim());
+  const items = (Array.isArray(raw) ? raw : raw.items || [])
+    .map((item, index) => ({
+      id: item.id || index + 1,
+      text: item.text || item.message || '',
+      ...(config.news.links && item.link ? { link: item.link } : {}),
+    }))
+    .filter((item) => item.text.trim());
 
   if (!config.anthropicKey) {
     console.error('Не задан ANTHROPIC_API_KEY в .env');
@@ -29,13 +33,13 @@ async function fromFile(file) {
   }
 
   console.error('Файловый режим делает один платный вызов модели, Telegram не трогает.');
-  const summarizer = createSummarizer({
+  const summary = await summarize({
+    llm: createLlm({ apiKey: config.anthropicKey, log }),
     model: config.news.model,
-    createMessage: news.createAnthropicCall(config.anthropicKey),
+    items,
     maxItems: config.news.maxItems,
     log,
   });
-  const summary = await summarizer.summarize(items);
   const parts = renderDigest(summary, {
     title: 'файл',
     total: items.length,
@@ -56,9 +60,17 @@ async function fromFile(file) {
     process.exit(0);
   }
 
-  const problem = news.whyNotConfigured();
-  if (problem) {
-    console.error(`Сводка не настроена: ${problem}`);
+  const setup = serviceSetup({
+    session: config.session,
+    channels: config.channels,
+    keywordsCount: 1,
+    anthropicKey: config.anthropicKey,
+    newsChannels: config.news.channels,
+    repliesChat: config.replies.chat,
+    repliesEnabled: config.replies.enabled,
+  });
+  if (!setup.features.digest.on) {
+    console.error(`Сводка не настроена: ${setup.features.digest.why}`);
     process.exit(1);
   }
 
@@ -71,26 +83,34 @@ async function fromFile(file) {
     process.exit(1);
   }
 
+  const clock = createClock();
+  const gateway = createGateway({ client, clock, log });
   const state = createState();
-  const sources = await news.resolveNewsSources(client, log);
-  if (sources.length === 0) {
+  const chats = await resolveChats(gateway, config.news.channels, log);
+  if (chats.length === 0) {
     console.error('Ни один канал не открылся');
     process.exit(1);
   }
 
-  const target = await client.getEntity(config.news.target);
-  const digest = news.createNewsDigest({
-    client,
-    sources,
-    target,
-    notify: async () => {},
+  const digest = createDigestJob({
+    gateway,
+    store: state,
+    llm: createLlm({ apiKey: config.anthropicKey, log }),
+    chats,
+    target: config.news.target,
+    model: config.news.model,
+    maxItems: config.news.maxItems,
+    maxMessages: config.news.maxMessages,
+    timeZone: config.news.timeZone,
+    hour: config.news.hour,
+    includeLinks: config.news.links,
+    clock,
     log,
   });
 
-  const result = await digest.run(state, { dryRun: args.dryRun });
+  const result = await digest.run({ dryRun: args.dryRun });
   if (args.dryRun) console.log(`\n${result.parts.join('\n\n— — —\n\n')}`);
 
-  state.flush();
   await client.disconnect();
   process.exit(0);
 })().catch((err) => {

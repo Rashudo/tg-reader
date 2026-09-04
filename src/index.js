@@ -14,7 +14,8 @@ const { createReplier } = require('./replier');
 const { createResponder } = require('./responder');
 const { createBotCommands } = require('./bot-commands');
 const { loadVoice } = require('./voice');
-const news = require('./news');
+const { createDigestJob, resolveChats } = require('./features/digest/job');
+const { createLlm, anthropicRequest } = require('./platform/llm/anthropic');
 const keywords = require('../keywords');
 
 const KEYWORDS = prepare(keywords, config.disabledGroups);
@@ -39,6 +40,7 @@ let client = null;
 let clock = null;
 let gateway = null;
 let forwarder = null;
+let setup = null;
 
 function log(...args) {
   console.log(new Date().toISOString(), ...args);
@@ -128,39 +130,47 @@ async function startForwarding() {
 }
 
 async function startNewsDigest() {
-  if (!news.isConfigured()) {
-    log(`Сводка новостей выключена: ${news.whyNotConfigured()}`);
+  if (!setup.features.digest.on) {
+    log(`Сводка новостей выключена: ${setup.features.digest.why}`);
     return;
   }
 
-  const newsSources = await news.resolveNewsSources(client, log);
-  if (newsSources.length === 0) {
+  const newsChats = await resolveChats(gateway, config.news.channels, log);
+  if (newsChats.length === 0) {
     log('Сводка новостей выключена: ни один канал не открылся');
     return;
   }
 
-  let newsTarget;
   try {
-    newsTarget = await client.getEntity(config.news.target);
+    await gateway.resolveChat(config.news.target);
   } catch (err) {
     log(`Сводка новостей выключена: не удалось открыть получателя "${config.news.target}" (${err.message})`);
     return;
   }
 
-  const digest = news.createNewsDigest({
-    client,
-    sources: newsSources,
-    target: newsTarget,
-    notify: (text) => notifier.send(text),
+  const digest = createDigestJob({
+    gateway,
+    store: state,
+    llm: createLlm({ apiKey: config.anthropicKey, log }),
+    chats: newsChats,
+    target: config.news.target,
+    model: config.news.model,
+    maxItems: config.news.maxItems,
+    maxMessages: config.news.maxMessages,
+    timeZone: config.news.timeZone,
+    hour: config.news.hour,
+    includeLinks: config.news.links,
+    clock,
     log,
+    notify: (text) => notifier.send(text),
   });
 
   let running = false;
   setInterval(async () => {
-    if (running || !digest.due(state)) return;
+    if (running || !digest.due()) return;
     running = true;
     try {
-      await digest.run(state);
+      await digest.run();
     } catch (err) {
       log(`Сводка новостей упала: ${err.message}`);
       await notifier.send(`🟠 tg-reader: сводка новостей упала — ${err.message}`);
@@ -170,7 +180,7 @@ async function startNewsDigest() {
   }, DIGEST_CHECK_INTERVAL_MS);
 
   log(
-    `Сводка новостей: ${newsSources.length} канал(ов), в ${config.news.hour}:00 по ${config.news.timeZone}, модель ${config.news.model}`
+    `Сводка новостей: ${newsChats.length} канал(ов), в ${config.news.hour}:00 по ${config.news.timeZone}, модель ${config.news.model}`
   );
 }
 
@@ -230,7 +240,7 @@ async function startReplies() {
     state,
     responder: createResponder({
       model: config.replies.model,
-      createMessage: news.createAnthropicCall(config.anthropicKey),
+      createMessage: anthropicRequest(config.anthropicKey),
       samples: voice.samples,
       maxChars: config.replies.maxChars,
       name: me.firstName || me.username || 'я',
@@ -303,7 +313,7 @@ async function startReplies() {
 }
 
 async function main() {
-  const setup = readSetup(KEYWORDS.length);
+  setup = readSetup(KEYWORDS.length);
   if (setup.error) {
     console.error(setup.error);
     process.exit(1);

@@ -1,4 +1,4 @@
-const { cut, TELEGRAM_LIMIT } = require('./platform/telegram/text');
+const { cut, TELEGRAM_LIMIT } = require('../../platform/telegram/text');
 
 function digestHeading({ title, at, timeZone }) {
   let day;

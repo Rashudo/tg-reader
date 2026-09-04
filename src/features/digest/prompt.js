@@ -1,13 +1,3 @@
-const DEFAULT_MODEL = 'claude-haiku-4-5';
-const MAX_TOKENS = 16000;
-
-const PRICES = {
-  'claude-haiku-4-5': { input: 1, output: 5 },
-  'claude-sonnet-5': { input: 2, output: 10 },
-  'claude-opus-5': { input: 5, output: 25 },
-  'claude-opus-4-8': { input: 5, output: 25 },
-};
-
 const SCHEMA = {
   type: 'object',
   properties: {
@@ -38,27 +28,6 @@ const SCHEMA = {
 };
 
 const DEFAULT_MAX_ITEMS = 35;
-const ATTEMPTS = 3;
-const RETRY_PAUSE_MS = 5000;
-
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-function worthRetrying(err) {
-  return err.status === 429 || (err.status >= 500 && err.status < 600);
-}
-
-async function withRetries(call, { attempts, pauseMs, log }) {
-  for (let attempt = 1; ; attempt += 1) {
-    try {
-      return await call();
-    } catch (err) {
-      if (attempt >= attempts || !worthRetrying(err)) throw err;
-      log(`Модель ответила ошибкой (${err.message}), попытка ${attempt + 1} из ${attempts}`);
-      await sleep(pauseMs * attempt);
-    }
-  }
-}
-
 function systemPrompt(maxItems) {
   return [
     'Ты составляешь ежедневную сводку по сообщениям Telegram-канала для одного читателя.',
@@ -110,12 +79,6 @@ function clampSummary(summary, maxItems) {
   return { ...summary, groups, dropped: (summary.dropped || 0) + cutAway };
 }
 
-function estimateCost(model, inputTokens, outputTokens) {
-  const price = PRICES[model];
-  if (!price) return null;
-  return (inputTokens / 1e6) * price.input + (outputTokens / 1e6) * price.output;
-}
-
 function buildUserMessage(items) {
   const lines = items.map((item) => {
     const link = item.link ? `\nссылка: ${item.link}` : '';
@@ -124,61 +87,5 @@ function buildUserMessage(items) {
   return `Сообщения канала за сутки, по одному на блок:\n\n${lines.join('\n\n')}`;
 }
 
-function textOf(response) {
-  const block = (response.content || []).find((part) => part.type === 'text');
-  return block ? block.text : '';
-}
 
-function createSummarizer({
-  model = DEFAULT_MODEL,
-  createMessage,
-  log = console.log,
-  maxItems = DEFAULT_MAX_ITEMS,
-  attempts = ATTEMPTS,
-  retryPauseMs = RETRY_PAUSE_MS,
-}) {
-  return {
-    async summarize(items) {
-      if (items.length === 0) return { groups: [], dropped: 0 };
-
-      const request = {
-        model,
-        max_tokens: MAX_TOKENS,
-        system: systemPrompt(maxItems),
-        messages: [{ role: 'user', content: buildUserMessage(items) }],
-        output_config: { format: { type: 'json_schema', schema: SCHEMA } },
-      };
-      const response = await withRetries(() => createMessage(request), {
-        attempts,
-        pauseMs: retryPauseMs,
-        log,
-      });
-
-      const usage = response.usage || {};
-      const cost = estimateCost(model, usage.input_tokens || 0, usage.output_tokens || 0);
-      log(
-        `Сводка: ${model}, токенов на входе ${usage.input_tokens || 0}, на выходе ${usage.output_tokens || 0}` +
-          (cost === null ? '' : `, примерно $${cost.toFixed(4)}`)
-      );
-
-      const text = textOf(response);
-      try {
-        const parsed = JSON.parse(text);
-        if (!Array.isArray(parsed.groups)) throw new Error('нет списка групп');
-        return clampSummary(parsed, maxItems);
-      } catch (err) {
-        log(`Модель ответила не по схеме (${err.message}) — отправляю как есть`);
-        return { raw: text };
-      }
-    },
-  };
-}
-
-module.exports = {
-  createSummarizer,
-  clampSummary,
-  estimateCost,
-  systemPrompt,
-  DEFAULT_MODEL,
-  DEFAULT_MAX_ITEMS,
-};
+module.exports = { SCHEMA, systemPrompt, clampSummary, buildUserMessage, DEFAULT_MAX_ITEMS };
