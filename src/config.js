@@ -34,7 +34,7 @@ const config = {
     hour: numFromEnv(process.env.NEWS_HOUR, 7),
     timeZone: (process.env.NEWS_TZ || 'Europe/Belgrade').trim(),
     maxMessages: numFromEnv(process.env.NEWS_MAX_MESSAGES, 400),
-    maxItems: numFromEnv(process.env.NEWS_MAX_ITEMS, 20),
+    maxItems: numFromEnv(process.env.NEWS_MAX_ITEMS, 35),
     links: (process.env.NEWS_LINKS || 'off').trim().toLowerCase() === 'on',
   },
   health: {
