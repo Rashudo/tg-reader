@@ -214,3 +214,9 @@ test('на ответ отводится вдвое больше токенов'
   await responder.compose({ window: WINDOW, trigger: null, mode: 'spontaneous' });
   assert.strictEqual(seen[0].max_tokens, 800);
 });
+
+test('роль описана как постироничная, а не язвительная', () => {
+  const prompt = systemPrompt({ samples: [], maxChars: 160, mode: 'addressed', name: 'Стас' });
+  assert.match(prompt, /постироничн/i);
+  assert.ok(!/язвительн/i.test(prompt));
+});
