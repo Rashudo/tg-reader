@@ -7,3 +7,5 @@ alert-state.json
 alert-state.json.tmp
 ai-artifacts/
 voice.json
+.claude/
+.env.backup-*
