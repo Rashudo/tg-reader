@@ -7,7 +7,7 @@ function pickSamples(messages, { limit = 60, minWords = 3, maxChars = 200 } = {}
   const seen = new Set();
   const picked = [];
   for (const message of messages) {
-    const text = (message.text || '').trim();
+    const text = (message.text || '').replace(/\s+/g, ' ').trim();
     if (!text || text.length > maxChars) continue;
     if (/https?:\/\//i.test(text)) continue;
     if (text.split(/\s+/).length < minWords) continue;

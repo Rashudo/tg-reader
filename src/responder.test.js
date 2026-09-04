@@ -158,9 +158,9 @@ test('свои сообщения в окне подписаны «ты», а н
   assert.match(content, /\[2\] Тимур: ну как\?/);
 });
 
-test('промпт запрещает подхватывать одну и ту же шутку', () => {
+test('промпт требует новой мысли в каждой реплике', () => {
   const prompt = systemPrompt({ samples: [], maxChars: 160, mode: 'addressed', name: 'Стас' });
-  assert.match(prompt, /не повторяй/i);
+  assert.match(prompt, /новая мысль/i);
   assert.match(prompt, /шутк/i);
 });
 
@@ -186,4 +186,30 @@ test('список сказанного доезжает до запроса', a
   });
   await responder.compose({ window: WINDOW, trigger: null, mode: 'spontaneous', avoid: ['про пироги'] });
   assert.match(seen[0].system, /про пироги/);
+});
+
+test('промпт целиком на «ты», без следов третьего лица', () => {
+  const prompt = systemPrompt({ samples: ['прост'], maxChars: 160, mode: 'addressed', name: 'Стас' });
+  assert.match(prompt, /так ты пишешь/i);
+  assert.ok(!/так он пишет/i.test(prompt));
+  assert.ok(!/его пунктуация/i.test(prompt));
+});
+
+test('промпт разрешает развивать тему, запрещая крутить одну формулировку', () => {
+  const prompt = systemPrompt({ samples: [], maxChars: 160, mode: 'addressed', name: 'Стас' });
+  assert.match(prompt, /развивать/i);
+  assert.match(prompt, /той же формулировк|одну и ту же/i);
+});
+
+test('на ответ отводится вдвое больше токенов', async () => {
+  const seen = [];
+  const responder = createResponder({
+    createMessage: async (req) => {
+      seen.push(req);
+      return answer({ reply: false, text: '' });
+    },
+    samples: [],
+  });
+  await responder.compose({ window: WINDOW, trigger: null, mode: 'spontaneous' });
+  assert.strictEqual(seen[0].max_tokens, 800);
 });

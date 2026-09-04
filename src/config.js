@@ -54,7 +54,7 @@ const config = {
     delayMaxSec: numFromEnv(process.env.REPLY_DELAY_MAX_SEC, 240),
     quietFrom: numFromEnv(process.env.REPLY_QUIET_FROM, 23),
     quietTo: numFromEnv(process.env.REPLY_QUIET_TO, 9),
-    context: numFromEnv(process.env.REPLY_CONTEXT, 30),
+    context: numFromEnv(process.env.REPLY_CONTEXT, 60),
     minFresh: numFromEnv(process.env.REPLY_MIN_FRESH, 5),
     ownerSilenceMin: numFromEnv(process.env.REPLY_OWNER_SILENCE_MIN, 15),
     maxChars: numFromEnv(process.env.REPLY_MAX_CHARS, 160),

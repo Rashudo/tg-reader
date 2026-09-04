@@ -19,6 +19,7 @@ function createReplier({
   ownerCancel = 'answer',
   ownerAnswerMs = 60 * 1000,
   staleAfterMs = 10 * 60 * 1000,
+  echoGuard = 2,
 }) {
   const window = [];
   const byId = new Map();
@@ -63,7 +64,7 @@ function createReplier({
       return false;
     }
 
-    if (repeatsRecent(composed.text, said)) {
+    if (repeatsRecent(composed.text, said.slice(-echoGuard))) {
       log(`Ответчик: повтор недавней шутки — молчу («${composed.text}»)`);
       return false;
     }

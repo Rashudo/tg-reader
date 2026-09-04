@@ -58,3 +58,12 @@ test('файл с образцами читается', () => {
   const file = tmpFile(JSON.stringify({ samples: ['прост', 'тор'] }));
   assert.deepStrictEqual(loadVoice(file), { samples: ['прост', 'тор'] });
 });
+
+test('многострочный образец склеивается в одну строку', () => {
+  const picked = pickSamples([{ text: 'я тут подумал, что денег в крипте много.\nПоэтому заказал кошелёк' }], {
+    limit: 10,
+    minWords: 3,
+    maxChars: 200,
+  });
+  assert.deepStrictEqual(picked, ['я тут подумал, что денег в крипте много. Поэтому заказал кошелёк']);
+});
