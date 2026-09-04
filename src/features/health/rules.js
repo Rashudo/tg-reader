@@ -50,17 +50,4 @@ function decide(snapshot, memory, thresholds) {
   return { alert: null, memory: base };
 }
 
-function parseUnitStatus(text) {
-  const fields = new Map();
-  for (const line of String(text || '').split('\n')) {
-    const at = line.indexOf('=');
-    if (at > 0) fields.set(line.slice(0, at).trim(), line.slice(at + 1).trim());
-  }
-  const restarts = Number(fields.get('NRestarts'));
-  return {
-    activeState: fields.get('ActiveState') || 'unknown',
-    restarts: Number.isInteger(restarts) && restarts >= 0 ? restarts : 0,
-  };
-}
-
-module.exports = { decide, parseUnitStatus };
+module.exports = { decide };

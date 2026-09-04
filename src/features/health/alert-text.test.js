@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { formatAlert } = require('./message');
+const { formatAlert } = require('./alert-text');
 
 const snapshot = { stateAgeMs: 50 * 60 * 1000, restarts: 7, serviceState: 'failed' };
 

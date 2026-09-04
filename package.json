@@ -8,7 +8,7 @@
     "login": "node src/login.js",
     "start": "node src/index.js",
     "scan": "node src/scan.js",
-    "health": "node src/healthcheck.js",
+    "health": "node --disable-warning=ExperimentalWarning bin/healthcheck.js",
     "digest": "node src/digest-cli.js",
     "alert-setup": "node src/alert-setup.js",
     "test": "node --disable-warning=ExperimentalWarning --test",

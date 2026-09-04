@@ -79,3 +79,10 @@ test('правило 2: фича не импортирует чужую фичу
   }
   assert.deepStrictEqual(guilty, [], `общее место фич — platform или shared: ${guilty.join(', ')}`);
 });
+
+test.skip('правило 5 (включается в задаче 9): process.exit живёт только в bin', () => {
+  const guilty = jsFilesUnder(srcRoot).filter((rel) =>
+    hasProcessExit(fs.readFileSync(path.join(srcRoot, rel), 'utf8'))
+  );
+  assert.deepStrictEqual(guilty, [], `ниже bin положено бросать, а не выходить: ${guilty.join(', ')}`);
+});

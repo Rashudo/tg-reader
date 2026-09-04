@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { decide } = require('./health');
+const { decide } = require('./rules');
 
 const HOUR = 60 * 60 * 1000;
 const THRESHOLDS = { stallMs: 45 * 60 * 1000, repeatMs: HOUR, digestHour: 9, flappingRestarts: 3 };
@@ -145,29 +145,6 @@ test('первая в жизни сводка считает от нуля', () 
   const { alert } = decide(s, memory, THRESHOLDS);
   assert.strictEqual(alert.checkedDelta, 42);
   assert.strictEqual(alert.forwardedDelta, 1);
-});
-
-const { parseUnitStatus } = require('./health');
-
-test('вывод systemctl разбирается в состояние и число перезапусков', () => {
-  const status = parseUnitStatus('ActiveState=active\nNRestarts=3\n');
-  assert.deepStrictEqual(status, { activeState: 'active', restarts: 3 });
-});
-
-test('порядок строк не важен', () => {
-  assert.deepStrictEqual(parseUnitStatus('NRestarts=7\nActiveState=failed'), {
-    activeState: 'failed',
-    restarts: 7,
-  });
-});
-
-test('отсутствующие поля и мусор не роняют проверку', () => {
-  assert.deepStrictEqual(parseUnitStatus(''), { activeState: 'unknown', restarts: 0 });
-  assert.deepStrictEqual(parseUnitStatus('чепуха'), { activeState: 'unknown', restarts: 0 });
-  assert.deepStrictEqual(parseUnitStatus('ActiveState=active\nNRestarts=x'), {
-    activeState: 'active',
-    restarts: 0,
-  });
 });
 
 test('перезапускающийся юнит — ещё не «упал»', () => {
