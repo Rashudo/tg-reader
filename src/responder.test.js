@@ -163,3 +163,27 @@ test('промпт запрещает подхватывать одну и ту 
   assert.match(prompt, /не повторяй/i);
   assert.match(prompt, /шутк/i);
 });
+
+test('в промпт уходит список уже сказанного', () => {
+  const prompt = systemPrompt({ samples: [], maxChars: 160, mode: 'addressed', name: 'Стас', avoid: ['только на рот парня'] });
+  assert.match(prompt, /только на рот парня/);
+  assert.match(prompt, /уже говорил/i);
+});
+
+test('без списка сказанного промпт не ломается', () => {
+  const prompt = systemPrompt({ samples: [], maxChars: 160, mode: 'addressed', name: 'Стас', avoid: [] });
+  assert.ok(!/уже говорил/i.test(prompt));
+});
+
+test('список сказанного доезжает до запроса', async () => {
+  const seen = [];
+  const responder = createResponder({
+    createMessage: async (req) => {
+      seen.push(req);
+      return answer({ reply: false, text: '' });
+    },
+    samples: [],
+  });
+  await responder.compose({ window: WINDOW, trigger: null, mode: 'spontaneous', avoid: ['про пироги'] });
+  assert.match(seen[0].system, /про пироги/);
+});

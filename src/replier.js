@@ -19,14 +19,12 @@ function createReplier({
   ownerCancel = 'answer',
   ownerAnswerMs = 60 * 1000,
   staleAfterMs = 10 * 60 * 1000,
-  echoMemory = 6,
 }) {
   const window = [];
   const byId = new Map();
   const queue = [];
   let ownerSpokeAt = null;
   let freshCount = 0;
-  const said = [];
 
   function remember(msg) {
     if (byId.has(msg.id)) return;
@@ -48,7 +46,9 @@ function createReplier({
   }
 
   async function speak({ mode, trigger }) {
+    const said = state.recentReplies();
     const composed = await responder.compose({
+      avoid: said,
       window: window.map((msg) => ({
         id: msg.id,
         author: msg.author,
@@ -74,8 +74,7 @@ function createReplier({
       parseMode: false,
     });
 
-    said.push(composed.text);
-    if (said.length > echoMemory) said.shift();
+    state.noteSaid(composed.text);
 
     if (posted && Number.isInteger(posted.id)) {
       remember({

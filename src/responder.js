@@ -29,7 +29,18 @@ function voiceBlock(samples) {
   return ['', 'Так он пишет на самом деле:', ...samples.map((sample) => `— ${sample}`), ''].join('\n');
 }
 
-function systemPrompt({ samples = [], maxChars = DEFAULT_MAX_CHARS, mode = 'spontaneous', name = 'Стас' }) {
+function avoidBlock(avoid) {
+  if (avoid.length === 0) return '';
+  return [
+    '',
+    'Ты уже говорил это недавно. Не повторяй эти обороты и не развивай эти шутки —',
+    'даже если чат их подхватил и они кажутся темой дня:',
+    ...avoid.map((line) => `— ${line}`),
+    '',
+  ].join('\n');
+}
+
+function systemPrompt({ samples = [], maxChars = DEFAULT_MAX_CHARS, mode = 'spontaneous', name = 'Стас', avoid = [] }) {
   const task =
     mode === 'addressed'
       ? [
@@ -49,6 +60,7 @@ function systemPrompt({ samples = [], maxChars = DEFAULT_MAX_CHARS, mode = 'spon
     '',
     ...task,
     voiceBlock(samples),
+    avoidBlock(avoid),
     'Правила:',
     `— одна фраза, не длиннее ${maxChars} символов; длинная складная реплика выдаёт подделку вернее всего;`,
     '— строчные буквы и его пунктуация, а не грамотная письменная речь;',
@@ -89,11 +101,11 @@ function createResponder({
   log = console.log,
 }) {
   return {
-    async compose({ window, trigger, mode }) {
+    async compose({ window, trigger, mode, avoid = [] }) {
       const response = await createMessage({
         model,
         max_tokens: MAX_TOKENS,
-        system: systemPrompt({ samples, maxChars, mode, name }),
+        system: systemPrompt({ samples, maxChars, mode, name, avoid }),
         messages: [{ role: 'user', content: buildUserMessage({ window, trigger }) }],
         output_config: { format: { type: 'json_schema', schema: SCHEMA } },
       });

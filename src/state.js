@@ -5,6 +5,7 @@ const STATE_PATH = process.env.TG_STATE_PATH || path.join(__dirname, '..', 'stat
 const FLUSH_DELAY_MS = 2000;
 const SENT_MEMORY = 300;
 const ANSWERED_MEMORY = 500;
+const SAID_MEMORY = 8;
 const SERVICE_KEY = '_service';
 
 function read(file) {
@@ -51,6 +52,7 @@ function normalizeReplies(value) {
     lastAddressedAt: 0,
     lastSpontaneousAt: 0,
     answered: [],
+    said: [],
     botOffset: 0,
   };
   if (!value || typeof value !== 'object') return empty;
@@ -62,6 +64,7 @@ function normalizeReplies(value) {
     lastAddressedAt: Number.isInteger(value.lastAddressedAt) ? value.lastAddressedAt : 0,
     lastSpontaneousAt: Number.isInteger(value.lastSpontaneousAt) ? value.lastSpontaneousAt : 0,
     answered: Array.isArray(value.answered) ? value.answered.filter(Number.isInteger) : [],
+    said: Array.isArray(value.said) ? value.said.filter((item) => typeof item === 'string') : [],
     botOffset: Number.isInteger(value.botOffset) ? value.botOffset : 0,
   };
 }
@@ -201,6 +204,16 @@ function createState(file = STATE_PATH) {
       replies = { ...replies, answered };
       schedule();
     },
+    recentReplies() {
+      return [...replies.said];
+    },
+    noteSaid(text) {
+      if (typeof text !== 'string' || !text.trim()) return;
+      const said = [...replies.said, text];
+      if (said.length > SAID_MEMORY) said.splice(0, said.length - SAID_MEMORY);
+      replies = { ...replies, said };
+      schedule();
+    },
     botOffset() {
       return replies.botOffset;
     },
@@ -248,4 +261,4 @@ function createState(file = STATE_PATH) {
   };
 }
 
-module.exports = { createState, STATE_PATH, SENT_MEMORY, ANSWERED_MEMORY };
+module.exports = { createState, STATE_PATH, SENT_MEMORY, ANSWERED_MEMORY, SAID_MEMORY };

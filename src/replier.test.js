@@ -8,6 +8,7 @@ const MIN = 60 * 1000;
 
 function fakeState() {
   let enabled = true;
+  const said = [];
   const answered = new Set();
   const counters = { addressed: 0, spontaneous: 0, lastAddressedAt: 0, lastSpontaneousAt: 0 };
   return {
@@ -22,6 +23,8 @@ function fakeState() {
     },
     wasAnswered: (id) => answered.has(id),
     noteAnswered: (id) => answered.add(id),
+    recentReplies: () => [...said],
+    noteSaid: (text) => said.push(text),
   };
 }
 
@@ -437,4 +440,29 @@ test('новая мысль после повтора проходит', async (
   clock.advance(5 * MIN);
   await replier.flush();
   assert.strictEqual(sent.length, 2);
+});
+
+test('оркестратор отдаёт модели список уже сказанного', async () => {
+  const seen = [];
+  let text = 'только на рот парня';
+  const { replier, clock } = rig({
+    responder: {
+      compose: async (input) => {
+        seen.push(input);
+        return { reply: true, text, replyToId: 11 };
+      },
+    },
+  });
+  await replier.onMessage(MINE);
+  await replier.onMessage(ASK);
+  clock.advance(5 * MIN);
+  await replier.flush();
+
+  text = 'бери противень поменьше';
+  await replier.onMessage({ id: 20, from: 'other', author: 'Женя', replyTo: 10, text: 'а рецепт?' });
+  clock.advance(5 * MIN);
+  await replier.flush();
+
+  assert.deepStrictEqual(seen[0].avoid, []);
+  assert.deepStrictEqual(seen[1].avoid, ['только на рот парня']);
 });

@@ -270,3 +270,20 @@ test('смещение бота хранится между запусками',
   s.flush();
   assert.strictEqual(createState(file).botOffset(), 17);
 });
+
+test('сказанное ботом переживает перезапуск', () => {
+  const file = tmpFile();
+  const first = createState(file);
+  first.noteSaid('только на рот парня');
+  first.noteSaid('два рта в одном тимуре');
+  first.flush();
+  assert.deepStrictEqual(createState(file).recentReplies(), ['только на рот парня', 'два рта в одном тимуре']);
+});
+
+test('память о сказанном не растёт бесконечно', () => {
+  const s = createState(tmpFile());
+  for (let i = 0; i < 20; i += 1) s.noteSaid(`реплика ${i}`);
+  const kept = s.recentReplies();
+  assert.strictEqual(kept.length, 8);
+  assert.strictEqual(kept.at(-1), 'реплика 19');
+});
