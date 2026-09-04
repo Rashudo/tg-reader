@@ -466,3 +466,31 @@ test('оркестратор отдаёт модели список уже ск�
   assert.deepStrictEqual(seen[0].avoid, []);
   assert.deepStrictEqual(seen[1].avoid, ['только на рот парня']);
 });
+
+test('при старте свои реплики из истории попадают в память о сказанном', async () => {
+  const state = fakeState();
+  const { replier } = rig({ state });
+  replier.seed([
+    { id: 1, from: 'other', author: 'Тимур', replyTo: null, text: 'а пирог будет?' },
+    { id: 2, from: ME, author: 'Стас', replyTo: 1, text: 'только на рот парня' },
+    { id: 3, from: ME, author: 'Стас', replyTo: null, text: 'два рта в одном тимуре' },
+  ]);
+  assert.deepStrictEqual(state.recentReplies(), ['только на рот парня', 'два рта в одном тимуре']);
+});
+
+test('после старта модель сразу знает, что уже было сказано', async () => {
+  const seen = [];
+  const { replier, clock } = rig({
+    responder: {
+      compose: async (input) => {
+        seen.push(input);
+        return { reply: false, text: '', replyToId: null };
+      },
+    },
+  });
+  replier.seed([{ id: 2, from: ME, author: 'Стас', replyTo: null, text: 'только на рот парня' }]);
+  await replier.onMessage({ id: 5, from: 'other', author: 'Женя', replyTo: 2, text: 'опять?' });
+  clock.advance(5 * MIN);
+  await replier.flush();
+  assert.deepStrictEqual(seen[0].avoid, ['только на рот парня']);
+});

@@ -103,6 +103,7 @@ function createReplier({
         const text = (msg.text || '').trim();
         if (!text) continue;
         remember({ ...msg, text });
+        if (String(msg.from) === String(meId)) state.noteSaid(text);
       }
     },
 
