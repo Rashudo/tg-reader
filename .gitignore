@@ -3,6 +3,9 @@ node_modules
 *.session
 state.json
 state.json.tmp
+state.db
+state.db-wal
+state.db-shm
 alert-state.json
 alert-state.json.tmp
 ai-artifacts/
