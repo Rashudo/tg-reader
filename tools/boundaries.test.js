@@ -47,3 +47,22 @@ test('видит process.exit в любом написании со скобко
   assert.strictEqual(hasProcessExit('const exit = process.exitCode;'), false);
   assert.strictEqual(hasProcessExit('const s = "process.exit(1)";'), false);
 });
+
+const srcRoot = path.join(__dirname, '..', 'src');
+
+function importsBySrcFile() {
+  const map = new Map();
+  for (const rel of jsFilesUnder(srcRoot)) {
+    map.set(rel, requiresOf(fs.readFileSync(path.join(srcRoot, rel), 'utf8')));
+  }
+  return map;
+}
+
+test('правило 6: telegram импортируется только в platform/telegram', () => {
+  const guilty = [];
+  for (const [file, imports] of importsBySrcFile()) {
+    if (file.startsWith('platform/telegram/')) continue;
+    if (imports.some((name) => name === 'telegram' || name.startsWith('telegram/'))) guilty.push(file);
+  }
+  assert.deepStrictEqual(guilty, [], `gramjs протёк за пределы адаптера: ${guilty.join(', ')}`);
+});

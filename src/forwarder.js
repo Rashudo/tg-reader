@@ -1,5 +1,5 @@
 const { findHits, describeHits } = require('./matcher');
-const { cut, messageLink } = require('./format');
+const { cut, messageLink } = require('./platform/telegram/text');
 
 const ALBUM_WINDOW_MS = 800;
 const BACKFILL_LIMIT = 50;

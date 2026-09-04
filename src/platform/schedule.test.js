@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { isDue, dueMomentOf } = require('./schedule');
+const { isDue, dueMomentOf } = require('./clock');
 
 const BELGRADE = 'Europe/Belgrade';
 const at = (iso) => Date.parse(iso);

@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const bigInt = require('big-integer');
 const { Api } = require('telegram');
-const { peerKey, eventPeerKey } = require('./peer');
+const { keyOf: peerKey, eventKeyOf: eventPeerKey } = require('./gateway');
 
 const raw = bigInt('1234567890');
 

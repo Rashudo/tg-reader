@@ -3,7 +3,7 @@ const { config } = require('./config');
 const { createSummarizer } = require('./summarizer');
 const { runDigest } = require('./digest');
 const { peerKey } = require('./peer');
-const { isDue } = require('./schedule');
+const { isDue } = require('./platform/clock');
 
 function createAnthropicCall(apiKey) {
   const client = new Anthropic({ apiKey });

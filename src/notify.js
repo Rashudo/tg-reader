@@ -1,6 +1,6 @@
 const https = require('https');
 
-const TELEGRAM_LIMIT = 4096;
+const { TELEGRAM_LIMIT } = require('./platform/telegram/text');
 
 function httpsPostJson(url, body) {
   return new Promise((resolve, reject) => {

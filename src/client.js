@@ -1,16 +1,8 @@
-const { TelegramClient } = require('telegram');
-const { StringSession } = require('telegram/sessions');
 const { config } = require('./config');
+const { createTelegramClient } = require('./platform/telegram/client');
 
-function createClient(sessionString = config.session) {
-  return new TelegramClient(
-    new StringSession(sessionString),
-    config.apiId,
-    config.apiHash,
-    {
-      floodSleepThreshold: 300,
-    }
-  );
+function createClient(session = config.session) {
+  return createTelegramClient({ apiId: config.apiId, apiHash: config.apiHash, session });
 }
 
 module.exports = { createClient };

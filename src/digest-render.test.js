@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const { renderDigest, digestHeading } = require('./digest-render');
-const { TELEGRAM_LIMIT } = require('./format');
+const { TELEGRAM_LIMIT } = require('./platform/telegram/text');
 
 const META = { title: 'Новости Нови-Сада', total: 214, at: Date.parse('2026-09-03T05:00:00Z'), timeZone: 'Europe/Belgrade' };
 

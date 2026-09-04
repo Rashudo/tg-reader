@@ -1,5 +1,5 @@
 const https = require('https');
-const { localDayOf } = require('./schedule');
+const { localDayOf } = require('./platform/clock');
 
 const POLL_TIMEOUT_SEC = 25;
 

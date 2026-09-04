@@ -1,6 +1,6 @@
 const { isAddressed, decideAddressed, decideSpontaneous } = require('./reply-rules');
 const { repeatsRecent } = require('./repetition');
-const { localDayOf } = require('./schedule');
+const { localDayOf } = require('./platform/clock');
 
 const OFF_BUTTON = [[{ text: 'Больше не отвечать', data: 'replies:off' }]];
 

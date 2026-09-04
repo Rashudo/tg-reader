@@ -1,12 +1,7 @@
 const { renderDigest } = require('./digest-render');
+const { messageLink } = require('./platform/telegram/text');
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-
-function linkTo(source, messageId) {
-  if (source && source.username) return `https://t.me/${source.username}/${messageId}`;
-  if (source && source.id) return `https://t.me/c/${source.id}/${messageId}`;
-  return undefined;
-}
 
 function toItems(messages, source, { since, maxMessages, includeLinks }) {
   return messages
@@ -17,7 +12,7 @@ function toItems(messages, source, { since, maxMessages, includeLinks }) {
     .map((msg) => ({
       id: msg.id,
       text: msg.message,
-      ...(includeLinks ? { link: linkTo(source, msg.id) } : {}),
+      ...(includeLinks ? { link: messageLink(source, msg.id) || undefined } : {}),
     }));
 }
 

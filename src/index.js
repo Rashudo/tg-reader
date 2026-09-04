@@ -1,10 +1,9 @@
-const { NewMessage } = require('telegram/events');
-const { EditedMessage } = require('telegram/events/EditedMessage');
 const { config } = require('./config');
 const { createClient } = require('./client');
 const { readSetup } = require('./preflight');
 const { prepare, summary, unknownGroups } = require('./matcher');
 const { peerKey, eventPeerKey } = require('./peer');
+const { subscribeMessages } = require('./platform/telegram/gateway');
 const { createState } = require('./state');
 const { withTimeout } = require('./async');
 const { createWatchdog, createStallWatchdog } = require('./watchdog');
@@ -105,9 +104,7 @@ async function startForwarding() {
     eventKeyOf: eventPeerKey,
   });
 
-  const onEvent = (event) => forwarder.onMessage(event);
-  client.addEventHandler(onEvent, new NewMessage({}));
-  client.addEventHandler(onEvent, new EditedMessage({}));
+  subscribeMessages(client, (event) => forwarder.onMessage(event), { edits: true });
 
   for (const source of sources.values()) {
     try {
@@ -282,12 +279,12 @@ async function startReplies() {
   }
 
   const chatKey = peerKey(chat);
-  client.addEventHandler((event) => {
+  subscribeMessages(client, (event) => {
     if (eventPeerKey(event) !== chatKey) return;
     const msg = chatMessageOf(event, names);
     if (!msg) return;
     replier.onMessage(msg).catch((err) => log(`Ответчик споткнулся на сообщении: ${err.message}`));
-  }, new NewMessage({}));
+  });
 
   setInterval(() => {
     replier.flush().catch((err) => log(`Ответчик: очередь не разобралась (${err.message})`));
