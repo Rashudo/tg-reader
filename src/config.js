@@ -42,6 +42,7 @@ const config = {
     enabled: (process.env.REPLY_ENABLED || 'on').trim().toLowerCase() !== 'off',
     model: (process.env.REPLY_MODEL || 'claude-opus-4-8').trim(),
     aliases: listFromEnv(process.env.REPLY_ALIASES),
+    banned: listFromEnv(process.env.REPLY_BANNED),
     dailyBudget: numFromEnv(process.env.REPLY_DAILY_BUDGET, 4),
     addressedBudget: numFromEnv(process.env.REPLY_ADDRESSED_BUDGET, 10),
     spontaneousPauseMs: pauseMsFrom(

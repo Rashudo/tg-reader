@@ -42,4 +42,23 @@ function repeatsRecent(text, recent, { forms = true } = {}) {
   return false;
 }
 
-module.exports = { repeatsRecent, bigrams, words };
+function normalize(text) {
+  return String(text || '').toLowerCase().replace(/ё/g, 'е');
+}
+
+function hitsBanned(text, banned) {
+  const haystack = normalize(text);
+  const tokens = words(haystack);
+  for (const entry of banned) {
+    const needle = normalize(entry).trim();
+    if (!needle) continue;
+    if (needle.includes(' ')) {
+      if (haystack.includes(needle)) return needle;
+      continue;
+    }
+    if (tokens.includes(needle)) return needle;
+  }
+  return null;
+}
+
+module.exports = { repeatsRecent, bigrams, words, hitsBanned };

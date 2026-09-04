@@ -494,3 +494,28 @@ test('после старта модель сразу знает, что уже 
   await replier.flush();
   assert.deepStrictEqual(seen[0].avoid, ['только на рот парня']);
 });
+
+test('реплика с запрещённым словом не уходит в чат', async () => {
+  const { replier, sent, clock, logs } = rig({
+    responder: { compose: async () => ({ reply: true, text: 'весь гит будет одним большим ртом парня', replyToId: 11 }) },
+    extra: { banned: ['рот', 'ртом'] },
+  });
+  await replier.onMessage(MINE);
+  await replier.onMessage(ASK);
+  clock.advance(5 * MIN);
+  await replier.flush();
+  assert.strictEqual(sent.length, 0);
+  assert.ok(logs.some((line) => /запрещ/i.test(line)));
+});
+
+test('без запрещённых слов реплика уходит как обычно', async () => {
+  const { replier, sent, clock } = rig({
+    responder: { compose: async () => ({ reply: true, text: 'бери противень поменьше', replyToId: 11 }) },
+    extra: { banned: ['рот', 'ртом'] },
+  });
+  await replier.onMessage(MINE);
+  await replier.onMessage(ASK);
+  clock.advance(5 * MIN);
+  await replier.flush();
+  assert.strictEqual(sent.length, 1);
+});

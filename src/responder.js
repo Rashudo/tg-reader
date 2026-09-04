@@ -40,7 +40,25 @@ function avoidBlock(avoid) {
   ].join('\n');
 }
 
-function systemPrompt({ samples = [], maxChars = DEFAULT_MAX_CHARS, mode = 'spontaneous', name = 'Стас', avoid = [] }) {
+function bannedBlock(banned) {
+  if (banned.length === 0) return '';
+  return [
+    '',
+    'Эти слова и обороты не используй ни в каком виде и ни в каком падеже,',
+    'даже если весь чат ими сыплет:',
+    ...banned.map((item) => `— ${item}`),
+    '',
+  ].join('\n');
+}
+
+function systemPrompt({
+  samples = [],
+  maxChars = DEFAULT_MAX_CHARS,
+  mode = 'spontaneous',
+  name = 'Стас',
+  avoid = [],
+  banned = [],
+}) {
   const task =
     mode === 'addressed'
       ? [
@@ -61,6 +79,7 @@ function systemPrompt({ samples = [], maxChars = DEFAULT_MAX_CHARS, mode = 'spon
     ...task,
     voiceBlock(samples),
     avoidBlock(avoid),
+    bannedBlock(banned),
     'Правила:',
     `— одна фраза, не длиннее ${maxChars} символов; длинная складная реплика выдаёт подделку вернее всего;`,
     '— строчные буквы и твоя пунктуация, а не грамотная письменная речь;',
@@ -103,11 +122,11 @@ function createResponder({
   log = console.log,
 }) {
   return {
-    async compose({ window, trigger, mode, avoid = [] }) {
+    async compose({ window, trigger, mode, avoid = [], banned = [] }) {
       const response = await createMessage({
         model,
         max_tokens: MAX_TOKENS,
-        system: systemPrompt({ samples, maxChars, mode, name, avoid }),
+        system: systemPrompt({ samples, maxChars, mode, name, avoid, banned }),
         messages: [{ role: 'user', content: buildUserMessage({ window, trigger }) }],
         output_config: { format: { type: 'json_schema', schema: SCHEMA } },
       });

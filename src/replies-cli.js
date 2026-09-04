@@ -93,6 +93,7 @@ function memoryState() {
       minFresh: config.replies.minFresh,
       ownerSilenceMs: config.replies.ownerSilenceMin * 60 * 1000,
     },
+    banned: config.replies.banned,
     ownerCancel: config.replies.ownerCancel,
     staleAfterMs: config.replies.staleAfterMin * 60 * 1000,
     log: note,

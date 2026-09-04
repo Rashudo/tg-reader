@@ -220,3 +220,9 @@ test('роль описана как постироничная, а не язв�
   assert.match(prompt, /постироничн/i);
   assert.ok(!/язвительн/i.test(prompt));
 });
+
+test('запрещённые слова названы в промпте', () => {
+  const prompt = systemPrompt({ samples: [], maxChars: 160, mode: 'addressed', name: 'Стас', banned: ['рот парня'] });
+  assert.match(prompt, /рот парня/);
+  assert.match(prompt, /не используй/i);
+});
