@@ -100,3 +100,26 @@ test('промпт для обращения и для своей воли ра�
 test('без образцов речи промпт не разваливается', () => {
   assert.ok(systemPrompt({ samples: [], maxChars: 160, mode: 'addressed' }).length > 100);
 });
+
+test('стоимость вызова попадает в журнал', async () => {
+  const lines = [];
+  const responder = createResponder({
+    createMessage: async () => ({
+      content: [{ type: 'text', text: JSON.stringify({ reply: false, text: '' }) }],
+      usage: { input_tokens: 2000, output_tokens: 50 },
+    }),
+    samples: [],
+    log: (line) => lines.push(line),
+  });
+  await responder.compose({ window: WINDOW, trigger: null, mode: 'spontaneous' });
+  assert.ok(lines.some((line) => /токенов на входе 2000/.test(line)));
+});
+
+test('ответ без учёта токенов не роняет вызов', async () => {
+  const responder = createResponder({
+    createMessage: async () => ({ content: [{ type: 'text', text: JSON.stringify({ reply: false, text: '' }) }] }),
+    samples: [],
+    log: () => {},
+  });
+  assert.strictEqual((await responder.compose({ window: WINDOW, trigger: null, mode: 'spontaneous' })).reply, false);
+});

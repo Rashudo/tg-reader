@@ -1,3 +1,5 @@
+const { estimateCost } = require('./summarizer');
+
 const DEFAULT_MODEL = 'claude-haiku-4-5';
 const MAX_TOKENS = 400;
 const DEFAULT_MAX_CHARS = 160;
@@ -90,6 +92,15 @@ function createResponder({
         messages: [{ role: 'user', content: buildUserMessage({ window, trigger }) }],
         output_config: { format: { type: 'json_schema', schema: SCHEMA } },
       });
+
+      const usage = response.usage || {};
+      if (usage.input_tokens) {
+        const cost = estimateCost(model, usage.input_tokens, usage.output_tokens || 0);
+        log(
+          `Ответчик: токенов на входе ${usage.input_tokens}, на выходе ${usage.output_tokens || 0}` +
+            (cost === null ? '' : `, примерно $${cost.toFixed(4)}`)
+        );
+      }
 
       let parsed;
       try {

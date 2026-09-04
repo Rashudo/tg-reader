@@ -11,7 +11,9 @@
     "health": "node src/healthcheck.js",
     "digest": "node src/digest-cli.js",
     "alert-setup": "node src/alert-setup.js",
-    "test": "node --test src/*.test.js"
+    "test": "node --test src/*.test.js",
+    "replies": "node src/replies-cli.js",
+    "voice": "node bin/export-voice.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",

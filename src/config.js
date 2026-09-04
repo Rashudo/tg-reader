@@ -54,6 +54,7 @@ const config = {
     minFresh: numFromEnv(process.env.REPLY_MIN_FRESH, 5),
     ownerSilenceMin: numFromEnv(process.env.REPLY_OWNER_SILENCE_MIN, 15),
     maxChars: numFromEnv(process.env.REPLY_MAX_CHARS, 160),
+    ownerCancel: (process.env.REPLY_OWNER_CANCEL || 'answer').trim().toLowerCase() === 'any' ? 'any' : 'answer',
     timeZone: (process.env.NEWS_TZ || 'Europe/Belgrade').trim(),
   },
   health: {

@@ -244,3 +244,46 @@ test('несозревшее обращение остаётся в очеред
   await replier.flush();
   assert.strictEqual(sent.length, 2);
 });
+
+test('по умолчанию очередь снимает только ответ хозяина на сам вопрос', async () => {
+  const { replier, sent, clock } = rig();
+  await replier.onMessage(MINE);
+  await replier.onMessage(ASK);
+  clock.advance(90 * 1000);
+  await replier.onMessage({ id: 13, from: ME, author: 'Стас', replyTo: null, text: 'кстати про другое' });
+  clock.advance(5 * MIN);
+  await replier.flush();
+  assert.strictEqual(sent.length, 1);
+});
+
+test('ответ хозяина именно на вопрос очередь снимает', async () => {
+  const { replier, sent, clock } = rig();
+  await replier.onMessage(MINE);
+  await replier.onMessage(ASK);
+  await replier.onMessage({ id: 13, from: ME, author: 'Стас', replyTo: 11, text: 'нормально' });
+  clock.advance(5 * MIN);
+  await replier.flush();
+  assert.strictEqual(sent.length, 0);
+});
+
+test('реплика хозяина сразу после вопроса тоже считается ответом', async () => {
+  const { replier, sent, clock } = rig();
+  await replier.onMessage(MINE);
+  await replier.onMessage(ASK);
+  clock.advance(30 * 1000);
+  await replier.onMessage({ id: 13, from: ME, author: 'Стас', replyTo: null, text: 'да норм' });
+  clock.advance(5 * MIN);
+  await replier.flush();
+  assert.strictEqual(sent.length, 0);
+});
+
+test('строгий режим снимает очередь на любое слово хозяина', async () => {
+  const { replier, sent, clock } = rig({ extra: { ownerCancel: 'any' } });
+  await replier.onMessage(MINE);
+  await replier.onMessage(ASK);
+  clock.advance(90 * 1000);
+  await replier.onMessage({ id: 13, from: ME, author: 'Стас', replyTo: null, text: 'кстати про другое' });
+  clock.advance(5 * MIN);
+  await replier.flush();
+  assert.strictEqual(sent.length, 0);
+});

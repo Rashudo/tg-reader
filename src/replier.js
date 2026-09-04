@@ -15,6 +15,8 @@ function createReplier({
   log = console.log,
   now = Date.now,
   random = Math.random,
+  ownerCancel = 'answer',
+  ownerAnswerMs = 60 * 1000,
 }) {
   const window = [];
   const byId = new Map();
@@ -75,9 +77,16 @@ function createReplier({
 
       remember({ ...msg, text });
       if (String(msg.from) === String(meId)) {
-        ownerSpokeAt = now();
+        const at = now();
+        ownerSpokeAt = at;
         for (let i = queue.length - 1; i >= 0; i -= 1) {
-          log(`Ответчик: хозяин ответил сам — снимаю ${queue[i].trigger.id} с очереди`);
+          const item = queue[i];
+          const answersIt =
+            ownerCancel === 'any' ||
+            msg.replyTo === item.trigger.id ||
+            at - item.queuedAt <= ownerAnswerMs;
+          if (!answersIt) continue;
+          log(`Ответчик: хозяин ответил сам — снимаю ${item.trigger.id} с очереди`);
           queue.splice(i, 1);
         }
         return;
@@ -88,7 +97,7 @@ function createReplier({
       if (state.wasAnswered(msg.id)) return;
       if (queue.some((item) => item.trigger.id === msg.id)) return;
 
-      queue.push({ trigger: { ...msg, text }, dueAt: now() + delayMs() });
+      queue.push({ trigger: { ...msg, text }, queuedAt: now(), dueAt: now() + delayMs() });
       log(`Ответчик: обращение ${msg.id} в очереди`);
     },
 

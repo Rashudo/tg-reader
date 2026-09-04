@@ -5,7 +5,7 @@ const { checkSetup } = require('./preflight');
 const base = { session: 'сессия', channels: ['@ch'], keywordsCount: 5, newsConfigured: false };
 
 test('всё настроено — работает пересылка', () => {
-  assert.deepStrictEqual(checkSetup(base), { error: null, warning: null, forwarding: true, news: false });
+  assert.deepStrictEqual(checkSetup(base), { error: null, warning: null, forwarding: true, news: false, replies: false });
 });
 
 test('без сессии не работает ничего', () => {
@@ -34,4 +34,22 @@ test('не настроено ничего — ошибка с обоими им
   const { error } = checkSetup({ ...base, channels: [], keywordsCount: 0, newsConfigured: false });
   assert.match(error, /CHANNEL/);
   assert.match(error, /NEWS_CHANNELS/);
+});
+
+test('автоответы сами по себе — уже повод запуститься', () => {
+  const setup = checkSetup({ session: 'x', channels: [], keywordsCount: 0, newsConfigured: false, repliesConfigured: true });
+  assert.strictEqual(setup.error, null);
+  assert.strictEqual(setup.replies, true);
+});
+
+test('без автоответов и всего прочего сервису делать нечего', () => {
+  const setup = checkSetup({ session: 'x', channels: [], keywordsCount: 0, newsConfigured: false, repliesConfigured: false });
+  assert.match(setup.error, /Нечего делать/);
+  assert.strictEqual(setup.replies, false);
+});
+
+test('пустые ключевые слова не мешают автоответам', () => {
+  const setup = checkSetup({ session: 'x', channels: ['a'], keywordsCount: 0, newsConfigured: false, repliesConfigured: true });
+  assert.strictEqual(setup.error, null);
+  assert.match(setup.warning, /автоответы/i);
 });
