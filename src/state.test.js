@@ -217,3 +217,11 @@ test('режим работы сервиса виден снаружи и пер
   state.flush();
   assert.strictEqual(createState(file).forwarding(), false);
 });
+
+test('момент подтверждённой тишины переживает перезапуск', () => {
+  const file = tmpFile();
+  const first = createState(file);
+  first.setProbeOkAt(1700000000000);
+  first.flush();
+  assert.strictEqual(createState(file).probeOkAt(), 1700000000000);
+});

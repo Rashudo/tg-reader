@@ -29,6 +29,7 @@ function createWatchdog({ isConnected, onGiveUp, log, limitMs, intervalMs, now =
 function createStallWatchdog({
   lastMessageAt,
   probe,
+  onQuiet = () => {},
   onReconnect,
   onGiveUp,
   log,
@@ -53,6 +54,7 @@ function createStallWatchdog({
       try {
         if (!(await probe())) {
           confirmedAt = now();
+          onQuiet(confirmedAt);
           log(`Из канала нет сообщений ${Math.round(silence / 60000)} мин, но и в самом канале нового нет — это тишина, а не застой`);
           return false;
         }

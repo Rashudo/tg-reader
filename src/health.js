@@ -29,12 +29,9 @@ function decide(snapshot, memory, thresholds) {
     return { alert: { kind }, memory: { ...base, lastKind: kind, lastAlertAt: snapshot.now } };
   }
 
-  if (memory.lastKind && memory.lastKind !== 'recovered') {
-    return {
-      alert: { kind: 'recovered' },
-      memory: { ...base, lastKind: 'recovered', lastAlertAt: snapshot.now },
-    };
-  }
+  base.lastKind = null;
+
+  if (!Number.isInteger(thresholds.digestHour)) return { alert: null, memory: base };
 
   const dueAt = digestDueAt(snapshot.now, thresholds.digestHour);
   if (snapshot.now >= dueAt && memory.lastDigestAt < dueAt) {

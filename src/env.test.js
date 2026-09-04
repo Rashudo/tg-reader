@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { numFromEnv } = require('./env');
+const { numFromEnv, hourOrOff } = require('./env');
 
 test('число из строки читается', () => {
   assert.strictEqual(numFromEnv('30', 15), 30);
@@ -40,4 +40,13 @@ test('незаданная переменная даёт пустой списо
   assert.deepStrictEqual(listFromEnv(undefined), []);
   assert.deepStrictEqual(listFromEnv(''), []);
   assert.deepStrictEqual(listFromEnv('  ,  '), []);
+});
+
+test('час суточной сводки выключен, пока его не задали', () => {
+  assert.strictEqual(hourOrOff(undefined), null);
+  assert.strictEqual(hourOrOff(''), null);
+  assert.strictEqual(hourOrOff('off'), null);
+  assert.strictEqual(hourOrOff('9'), 9);
+  assert.strictEqual(hourOrOff('0'), 0);
+  assert.strictEqual(hourOrOff('25'), null);
 });

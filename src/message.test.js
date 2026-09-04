@@ -18,10 +18,6 @@ test('в тревоге о застое есть, сколько минут ти
   assert.match(formatAlert({ kind: 'stall' }, snapshot), /50 мин/);
 });
 
-test('восстановление сообщается отдельно', () => {
-  assert.match(formatAlert({ kind: 'recovered' }, snapshot), /норм/i);
-});
-
 test('в сводке есть обе цифры за сутки', () => {
   const text = formatAlert({ kind: 'digest', checkedDelta: 1400, forwardedDelta: 3 }, snapshot);
   assert.match(text, /1400/);

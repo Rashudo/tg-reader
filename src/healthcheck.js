@@ -49,7 +49,11 @@ function main() {
   const state = createState();
   const status = unitStatus(config.health.serviceName);
 
-  const since = Math.max(state.lastMessageAt() || 0, state.startedAt() || 0);
+  const since = Math.max(
+    state.lastMessageAt() || 0,
+    state.startedAt() || 0,
+    state.probeOkAt() || 0
+  );
   const snapshot = {
     now,
     activeState: status.activeState,

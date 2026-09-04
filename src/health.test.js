@@ -35,17 +35,18 @@ test('через час та же тревога повторяется', () => 
   assert.strictEqual(decide(s, memory, THRESHOLDS).alert.kind, 'dead');
 });
 
-test('после тревоги здоровое состояние даёт «восстановилось»', () => {
+test('здоровое состояние после тревоги ничего не шлёт', () => {
   const s = snapshot();
   const memory = { ...EMPTY, lastKind: 'dead', lastAlertAt: s.now - 5 * 60 * 1000 };
-  assert.strictEqual(decide(s, memory, THRESHOLDS).alert.kind, 'recovered');
+  assert.strictEqual(decide(s, memory, THRESHOLDS).alert, null);
 });
 
-test('«восстановилось» не повторяется, пока всё хорошо', () => {
+test('после выздоровления новая тревога приходит сразу, а не через час', () => {
   const s = snapshot();
   const memory = { ...EMPTY, lastKind: 'dead', lastAlertAt: s.now - 5 * 60 * 1000 };
   const after = decide(s, memory, THRESHOLDS).memory;
-  assert.strictEqual(decide(snapshot({ now: s.now + 60000 }), after, THRESHOLDS).alert, null);
+  const next = decide(snapshot({ now: s.now + 60000, serviceActive: false }), after, THRESHOLDS);
+  assert.strictEqual(next.alert.kind, 'dead');
 });
 
 test('сервис жив, но давно не видел сообщений — тревога о застое', () => {
@@ -86,11 +87,11 @@ test('счётчик перезапусков запоминается, стар
   assert.notStrictEqual(next.alert && next.alert.kind, 'flapping');
 });
 
-test('прекратившийся цикл перезапусков даёт «восстановилось»', () => {
+test('прекратившийся цикл перезапусков не даёт никакой тревоги', () => {
   const s = snapshot({ restarts: 4 });
   const after = decide(s, EMPTY, THRESHOLDS).memory;
   const next = decide(snapshot({ now: s.now + 2 * HOUR, restarts: 5 }), after, THRESHOLDS);
-  assert.strictEqual(next.alert.kind, 'recovered');
+  assert.strictEqual(next.alert, null);
 });
 
 function atLocalHour(day, hour, minute = 0) {
@@ -200,4 +201,11 @@ test('без указания режима поведение прежнее', (
 test('остановленный сервис важнее выключенной пересылки', () => {
   const s = snapshot({ serviceActive: false, forwarding: false });
   assert.strictEqual(decide(s, EMPTY, THRESHOLDS).alert.kind, 'dead');
+});
+
+test('без часа суточной сводки её не шлём вовсе', () => {
+  const s = snapshot({ now: atLocalHour('2026-09-03', 9, 5) });
+  const memory = { ...EMPTY, lastDigestAt: atLocalHour('2026-09-02', 9) };
+  const quiet = { ...THRESHOLDS, digestHour: null };
+  assert.strictEqual(decide(s, memory, quiet).alert, null);
 });
