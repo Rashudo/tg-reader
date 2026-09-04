@@ -1,6 +1,9 @@
 const { isAddressed, decideAddressed, decideSpontaneous } = require('./reply-rules');
 const { repeatsRecent } = require('./repetition');
+const { emojiCounts, emojiVotes, tally, verdictOf } = require('./reactions');
 const { localDayOf } = require('./schedule');
+
+const GRADED_SHOWN = 5;
 
 const OFF_BUTTON = [[{ text: 'Больше не отвечать', data: 'replies:off' }]];
 
@@ -16,6 +19,7 @@ function createReplier({
   log = console.log,
   now = Date.now,
   random = Math.random,
+  reactions = { good: [], bad: [] },
   ownerCancel = 'answer',
   ownerAnswerMs = 60 * 1000,
   staleAfterMs = 10 * 60 * 1000,
@@ -37,6 +41,20 @@ function createReplier({
     }
   }
 
+  function graded() {
+    const posted = state.postedReplies ? state.postedReplies() : [];
+    const pick = (side) =>
+      posted
+        .filter((item) => item.text && verdictOf(item) === side)
+        .slice(-GRADED_SHOWN)
+        .map((item) => item.text);
+    return { liked: pick('good'), disliked: pick('bad') };
+  }
+
+  function score(counts) {
+    return tally(counts, reactions);
+  }
+
   function delayMs() {
     const spread = Math.max(0, limits.delayMaxMs - limits.delayMinMs);
     return limits.delayMinMs + Math.round(random() * spread);
@@ -50,6 +68,7 @@ function createReplier({
     const said = state.recentReplies();
     const composed = await responder.compose({
       avoid: said,
+      graded: graded(),
       window: window.map((msg) => ({
         id: msg.id,
         author: msg.author,
@@ -77,6 +96,7 @@ function createReplier({
 
     state.noteSaid(composed.text);
 
+    const at = now();
     if (posted && Number.isInteger(posted.id)) {
       remember({
         id: posted.id,
@@ -87,17 +107,29 @@ function createReplier({
       });
     }
 
-    const at = now();
     if (trigger) state.noteAnswered(trigger.id);
     state.noteReply(mode === 'addressed' ? 'addressed' : 'spontaneous', at, localDayOf(at, limits.quiet.timeZone));
     log(`Ответчик: отправлено (${mode}) — ${composed.text}`);
-    await notifier.send(`💬 Ответил в чате: ${composed.text}`, { buttons: OFF_BUTTON });
+    const note = await notifier.deliver(`💬 Ответил в чате: ${composed.text}`, { buttons: OFF_BUTTON });
+    if (posted && Number.isInteger(posted.id) && state.notePosted) {
+      state.notePosted({ id: posted.id, noteId: (note && note.id) || null, text: composed.text, at });
+    }
     return true;
   }
 
   return {
     window: () => window,
     pending: () => queue.length,
+
+    async onChatReaction({ id, results }) {
+      const hit = state.gradeFromChat(id, score(emojiCounts(results)));
+      if (hit) log(`Ответчик: оценка чата ${verdictOf(hit) || 'снята'} — «${hit.text}»`);
+    },
+
+    async onNoteReaction({ noteId, reactions: given }) {
+      const hit = state.gradeFromNote(noteId, score(emojiVotes(given)));
+      if (hit) log(`Ответчик: твоя оценка ${verdictOf(hit) || 'снята'} — «${hit.text}»`);
+    },
 
     seed(messages) {
       for (const msg of messages) {

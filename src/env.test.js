@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { numFromEnv, hourOrOff } = require('./env');
+const { numFromEnv, hourOrOff, listOr } = require('./env');
 
 test('число из строки читается', () => {
   assert.strictEqual(numFromEnv('30', 15), 30);
@@ -49,4 +49,12 @@ test('час суточной сводки выключен, пока его н�
   assert.strictEqual(hourOrOff('9'), 9);
   assert.strictEqual(hourOrOff('0'), 0);
   assert.strictEqual(hourOrOff('25'), null);
+});
+
+test('набор реакций из .env перекрывает значение по умолчанию', () => {
+  assert.deepStrictEqual(listOr('💯, 🔥', ['👍']), ['💯', '🔥']);
+});
+
+test('пустая переменная оставляет набор по умолчанию', () => {
+  assert.deepStrictEqual(listOr('   ', ['👍']), ['👍']);
 });

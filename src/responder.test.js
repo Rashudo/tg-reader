@@ -232,3 +232,42 @@ test('в режиме обращения задача — ответить им�
   const prompt = systemPrompt({ samples: [], maxChars: 160, mode: 'addressed', name: 'Стас' });
   assert.match(prompt, /именно на это сообщение/i);
 });
+
+test('удачные реплики попадают в промпт с пометкой «зашло»', () => {
+  const prompt = systemPrompt({ graded: { liked: ['ну да, конечно'], disliked: [] } });
+  assert.match(prompt, /зашло: «ну да, конечно»/);
+});
+
+test('неудачные реплики попадают в промпт с пометкой «не зашло»', () => {
+  const prompt = systemPrompt({ graded: { liked: [], disliked: ['рот парня'] } });
+  assert.match(prompt, /не зашло: «рот парня»/);
+});
+
+test('оценённые реплики даны как интонация, а не как текст для повтора', () => {
+  const prompt = systemPrompt({ graded: { liked: ['ну да, конечно'], disliked: [] } });
+  assert.match(prompt, /дословно.*не повтор/s);
+});
+
+test('без оценок блока в промпте нет', () => {
+  const prompt = systemPrompt({ graded: { liked: [], disliked: [] } });
+  assert.doesNotMatch(prompt, /зашло/);
+});
+
+test('compose доносит оценки до модели', async () => {
+  let seen = null;
+  const responder = createResponder({
+    createMessage: async (request) => {
+      seen = request.system;
+      return answer({ reply: false, text: '' });
+    },
+    samples: [],
+  });
+  await responder.compose({
+    window: WINDOW,
+    trigger: null,
+    mode: 'spontaneous',
+    graded: { liked: ['зашедшая реплика'], disliked: ['провальная реплика'] },
+  });
+  assert.match(seen, /зашло: «зашедшая реплика»/);
+  assert.match(seen, /не зашло: «провальная реплика»/);
+});

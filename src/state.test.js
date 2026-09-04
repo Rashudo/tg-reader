@@ -3,7 +3,7 @@ const assert = require('node:assert');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { createState, SENT_MEMORY } = require('./state');
+const { createState, SENT_MEMORY, POSTED_MEMORY } = require('./state');
 
 function tmpFile() {
   return path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'tg-state-')), 'state.json');
@@ -308,4 +308,71 @@ test('сброс переживает перезапуск', () => {
   first.resetReplyCounters();
   first.flush();
   assert.strictEqual(createState(file).replyCounters('2026-09-04').spontaneous, 0);
+});
+
+test('отправленная реплика запоминается вместе с id уведомления', () => {
+  const s = createState(tmpFile());
+  s.notePosted({ id: 174912, noteId: 55, text: 'ну да, конечно', at: 1000 });
+  assert.deepStrictEqual(s.postedReplies(), [
+    { id: 174912, noteId: 55, text: 'ну да, конечно', at: 1000, chat: { good: 0, bad: 0 }, note: { good: 0, bad: 0 } },
+  ]);
+});
+
+test('оценка из чата ложится на нужную реплику', () => {
+  const s = createState(tmpFile());
+  s.notePosted({ id: 1, noteId: 11, text: 'первая', at: 1000 });
+  s.notePosted({ id: 2, noteId: 12, text: 'вторая', at: 2000 });
+  const hit = s.gradeFromChat(2, { good: 3, bad: 0 });
+  assert.strictEqual(hit.text, 'вторая');
+  assert.deepStrictEqual(s.postedReplies()[1].chat, { good: 3, bad: 0 });
+  assert.deepStrictEqual(s.postedReplies()[0].chat, { good: 0, bad: 0 });
+});
+
+test('оценка из лички находит реплику по id уведомления', () => {
+  const s = createState(tmpFile());
+  s.notePosted({ id: 1, noteId: 11, text: 'первая', at: 1000 });
+  const hit = s.gradeFromNote(11, { good: 0, bad: 1 });
+  assert.strictEqual(hit.text, 'первая');
+  assert.deepStrictEqual(s.postedReplies()[0].note, { good: 0, bad: 1 });
+});
+
+test('оценка по незнакомому сообщению никого не задевает', () => {
+  const s = createState(tmpFile());
+  s.notePosted({ id: 1, noteId: 11, text: 'первая', at: 1000 });
+  assert.strictEqual(s.gradeFromChat(999, { good: 1, bad: 0 }), null);
+  assert.strictEqual(s.gradeFromNote(999, { good: 1, bad: 0 }), null);
+  assert.deepStrictEqual(s.postedReplies()[0].chat, { good: 0, bad: 0 });
+});
+
+test('память об отправленных репликах ограничена', () => {
+  const s = createState(tmpFile());
+  for (let i = 1; i <= POSTED_MEMORY + 5; i += 1) s.notePosted({ id: i, noteId: null, text: `реплика ${i}`, at: i });
+  const posted = s.postedReplies();
+  assert.strictEqual(posted.length, POSTED_MEMORY);
+  assert.strictEqual(posted[0].id, 6);
+});
+
+test('оценки переживают перезапуск', () => {
+  const file = tmpFile();
+  const first = createState(file);
+  first.notePosted({ id: 1, noteId: 11, text: 'первая', at: 1000 });
+  first.gradeFromChat(1, { good: 2, bad: 0 });
+  first.flush();
+  assert.deepStrictEqual(createState(file).postedReplies()[0].chat, { good: 2, bad: 0 });
+});
+
+test('снятая реакция обнуляет прежнюю оценку', () => {
+  const s = createState(tmpFile());
+  s.notePosted({ id: 1, noteId: 11, text: 'первая', at: 1000 });
+  s.gradeFromChat(1, { good: 2, bad: 0 });
+  s.gradeFromChat(1, { good: 0, bad: 0 });
+  assert.deepStrictEqual(s.postedReplies()[0].chat, { good: 0, bad: 0 });
+});
+
+test('состояние без раздела оценок читается как пустое', () => {
+  const file = tmpFile();
+  fs.writeFileSync(file, JSON.stringify({ _service: { replies: { said: ['привет'] } } }));
+  const s = createState(file);
+  assert.deepStrictEqual(s.postedReplies(), []);
+  assert.deepStrictEqual(s.recentReplies(), ['привет']);
 });

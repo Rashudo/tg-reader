@@ -27,4 +27,9 @@ function listFromEnv(raw) {
     .filter(Boolean);
 }
 
-module.exports = { numFromEnv, hourOrOff, pauseMsFrom, listFromEnv };
+function listOr(raw, fallback) {
+  const list = listFromEnv(raw);
+  return list.length ? list : fallback;
+}
+
+module.exports = { numFromEnv, hourOrOff, pauseMsFrom, listFromEnv, listOr };

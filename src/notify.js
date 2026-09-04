@@ -31,34 +31,40 @@ function httpsPostJson(url, body) {
 }
 
 function createNotifier({ token, chatId, request = httpsPostJson, log = console.error }) {
+  async function deliver(text, { buttons } = {}) {
+    if (!token || !chatId) return { ok: false, id: null };
+    try {
+      const result = await request(`https://api.telegram.org/bot${token}/sendMessage`, {
+        chat_id: chatId,
+        text: text.slice(0, TELEGRAM_LIMIT),
+        disable_web_page_preview: true,
+        ...(buttons
+          ? {
+              reply_markup: {
+                inline_keyboard: buttons.map((row) =>
+                  row.map((button) => ({ text: button.text, callback_data: button.data }))
+                ),
+              },
+            }
+          : {}),
+      });
+      if (result && result.ok === false) {
+        log(`Уведомление не доставлено: ${result.description}`);
+        return { ok: false, id: null };
+      }
+      const id = result && result.result && result.result.message_id;
+      return { ok: true, id: Number.isInteger(id) ? id : null };
+    } catch (err) {
+      log(`Уведомление не доставлено: ${err.message}`);
+      return { ok: false, id: null };
+    }
+  }
+
   return {
     enabled: Boolean(token && chatId),
-    async send(text, { buttons } = {}) {
-      if (!token || !chatId) return false;
-      try {
-        const result = await request(`https://api.telegram.org/bot${token}/sendMessage`, {
-          chat_id: chatId,
-          text: text.slice(0, TELEGRAM_LIMIT),
-          disable_web_page_preview: true,
-          ...(buttons
-            ? {
-                reply_markup: {
-                  inline_keyboard: buttons.map((row) =>
-                    row.map((button) => ({ text: button.text, callback_data: button.data }))
-                  ),
-                },
-              }
-            : {}),
-        });
-        if (result && result.ok === false) {
-          log(`Уведомление не доставлено: ${result.description}`);
-          return false;
-        }
-        return true;
-      } catch (err) {
-        log(`Уведомление не доставлено: ${err.message}`);
-        return false;
-      }
+    deliver,
+    async send(text, options) {
+      return (await deliver(text, options)).ok;
     },
   };
 }

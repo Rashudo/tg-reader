@@ -5,6 +5,7 @@ const { createBotCommands } = require('./bot-commands');
 function fakeState() {
   let enabled = true;
   let offset = 0;
+  let posted = [];
   return {
     repliesEnabled: () => enabled,
     setRepliesEnabled: (on) => {
@@ -15,6 +16,10 @@ function fakeState() {
       offset = value;
     },
     replyCounters: () => ({ addressed: 2, spontaneous: 1, lastAddressedAt: 0, lastSpontaneousAt: 0 }),
+    postedReplies: () => posted,
+    setPosted: (items) => {
+      posted = items;
+    },
   };
 }
 
@@ -144,4 +149,74 @@ test('сброс из чужого чата не проходит', async () => 
   const { bot } = rig([{ update_id: 13, message: { text: 'сброс', chat: { id: 999 } } }], { state });
   await bot.poll();
   assert.strictEqual(reset, 0);
+});
+
+test('поллер просит у Bot API реакции', async () => {
+  const { bot, calls } = rig([]);
+  await bot.poll();
+  const poll = calls.find((call) => call.url.includes('getUpdates'));
+  assert.ok(poll.body.allowed_updates.includes('message_reaction'));
+});
+
+test('реакция в личке уходит в ответчик', async () => {
+  const seen = [];
+  const { bot } = rig(
+    [
+      {
+        update_id: 9,
+        message_reaction: {
+          chat: { id: 7 },
+          message_id: 55,
+          new_reaction: [{ type: 'emoji', emoji: '💯' }],
+        },
+      },
+    ],
+    { extra: { onReaction: (event) => seen.push(event) } }
+  );
+  await bot.poll();
+  assert.deepStrictEqual(seen, [{ noteId: 55, reactions: [{ type: 'emoji', emoji: '💯' }] }]);
+});
+
+test('реакция в чужом чате игнорируется', async () => {
+  const seen = [];
+  const { bot } = rig(
+    [{ update_id: 10, message_reaction: { chat: { id: 999 }, message_id: 55, new_reaction: [] } }],
+    { extra: { onReaction: (event) => seen.push(event) } }
+  );
+  await bot.poll();
+  assert.deepStrictEqual(seen, []);
+});
+
+test('«оценки» показывают последние реплики с их реакциями', async () => {
+  const state = fakeState();
+  state.setPosted([
+    { id: 1, noteId: 11, text: 'первая', at: 1000, chat: { good: 2, bad: 0 }, note: { good: 0, bad: 0 } },
+    { id: 2, noteId: 12, text: 'вторая', at: 2000, chat: { good: 0, bad: 0 }, note: { good: 0, bad: 1 } },
+    { id: 3, noteId: 13, text: 'третья', at: 3000, chat: { good: 0, bad: 0 }, note: { good: 0, bad: 0 } },
+  ]);
+  const { bot, calls } = rig([{ update_id: 11, message: { text: 'оценки', chat: { id: 7 } } }], { state });
+  await bot.poll();
+  const said = calls.find((call) => call.url.includes('sendMessage')).body.text;
+  assert.match(said, /👍 «первая»/);
+  assert.match(said, /👎 «вторая»/);
+  assert.match(said, /третья/);
+});
+
+test('«оценки» без единой реплики не притворяются, что они есть', async () => {
+  const { bot, calls } = rig([{ update_id: 12, message: { text: 'оценки', chat: { id: 7 } } }]);
+  await bot.poll();
+  const said = calls.find((call) => call.url.includes('sendMessage')).body.text;
+  assert.match(said, /Оценок пока нет/);
+});
+
+test('статус подсчитывает оценки', async () => {
+  const state = fakeState();
+  state.setPosted([
+    { id: 1, noteId: 11, text: 'первая', at: 1000, chat: { good: 2, bad: 0 }, note: { good: 0, bad: 0 } },
+    { id: 2, noteId: 12, text: 'вторая', at: 2000, chat: { good: 0, bad: 0 }, note: { good: 0, bad: 1 } },
+  ]);
+  const { bot, calls } = rig([{ update_id: 13, message: { text: 'статус', chat: { id: 7 } } }], { state });
+  await bot.poll();
+  const said = calls.find((call) => call.url.includes('sendMessage')).body.text;
+  assert.match(said, /Оценки: 👍 1, 👎 1/);
 });

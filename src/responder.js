@@ -40,7 +40,26 @@ function avoidBlock(avoid) {
   ].join('\n');
 }
 
-function systemPrompt({ samples = [], maxChars = DEFAULT_MAX_CHARS, mode = 'spontaneous', name = 'Стас', avoid = [] }) {
+function gradedBlock({ liked = [], disliked = [] } = {}) {
+  if (liked.length === 0 && disliked.length === 0) return '';
+  return [
+    '',
+    'Так твои реплики принимали в чате. Это про попадание и интонацию;',
+    'дословно эти фразы не повторяй:',
+    ...liked.map((line) => `— зашло: «${line}»`),
+    ...disliked.map((line) => `— не зашло: «${line}»`),
+    '',
+  ].join('\n');
+}
+
+function systemPrompt({
+  samples = [],
+  maxChars = DEFAULT_MAX_CHARS,
+  mode = 'spontaneous',
+  name = 'Стас',
+  avoid = [],
+  graded = {},
+}) {
   const task =
     mode === 'addressed'
       ? [
@@ -60,6 +79,7 @@ function systemPrompt({ samples = [], maxChars = DEFAULT_MAX_CHARS, mode = 'spon
     '',
     ...task,
     voiceBlock(samples),
+    gradedBlock(graded),
     avoidBlock(avoid),
     'Правила:',
     `— одна фраза, не длиннее ${maxChars} символов; длинная складная реплика выдаёт подделку вернее всего;`,
@@ -105,11 +125,11 @@ function createResponder({
   log = console.log,
 }) {
   return {
-    async compose({ window, trigger, mode, avoid = [] }) {
+    async compose({ window, trigger, mode, avoid = [], graded = {} }) {
       const response = await createMessage({
         model,
         max_tokens: MAX_TOKENS,
-        system: systemPrompt({ samples, maxChars, mode, name, avoid }),
+        system: systemPrompt({ samples, maxChars, mode, name, avoid, graded }),
         messages: [{ role: 'user', content: buildUserMessage({ window, trigger }) }],
         output_config: { format: { type: 'json_schema', schema: SCHEMA } },
       });
@@ -146,4 +166,4 @@ function createResponder({
   };
 }
 
-module.exports = { createResponder, systemPrompt, clampText, SCHEMA };
+module.exports = { createResponder, systemPrompt, clampText, gradedBlock, SCHEMA };

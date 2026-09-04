@@ -6,6 +6,7 @@ const FLUSH_DELAY_MS = 2000;
 const SENT_MEMORY = 300;
 const ANSWERED_MEMORY = 500;
 const SAID_MEMORY = 8;
+const POSTED_MEMORY = 40;
 const SERVICE_KEY = '_service';
 
 function read(file) {
@@ -43,6 +44,26 @@ function normalizeEntry(value) {
   };
 }
 
+function normalizeScore(value) {
+  const score = value && typeof value === 'object' ? value : {};
+  return {
+    good: Number.isInteger(score.good) ? score.good : 0,
+    bad: Number.isInteger(score.bad) ? score.bad : 0,
+  };
+}
+
+function normalizePosted(value) {
+  if (!value || typeof value !== 'object' || !Number.isInteger(value.id)) return null;
+  return {
+    id: value.id,
+    noteId: Number.isInteger(value.noteId) ? value.noteId : null,
+    text: typeof value.text === 'string' ? value.text : '',
+    at: Number.isInteger(value.at) ? value.at : 0,
+    chat: normalizeScore(value.chat),
+    note: normalizeScore(value.note),
+  };
+}
+
 function normalizeReplies(value) {
   const empty = {
     enabled: true,
@@ -53,6 +74,7 @@ function normalizeReplies(value) {
     lastSpontaneousAt: 0,
     answered: [],
     said: [],
+    posted: [],
     botOffset: 0,
   };
   if (!value || typeof value !== 'object') return empty;
@@ -65,6 +87,7 @@ function normalizeReplies(value) {
     lastSpontaneousAt: Number.isInteger(value.lastSpontaneousAt) ? value.lastSpontaneousAt : 0,
     answered: Array.isArray(value.answered) ? value.answered.filter(Number.isInteger) : [],
     said: Array.isArray(value.said) ? value.said.filter((item) => typeof item === 'string') : [],
+    posted: Array.isArray(value.posted) ? value.posted.map(normalizePosted).filter(Boolean) : [],
     botOffset: Number.isInteger(value.botOffset) ? value.botOffset : 0,
   };
 }
@@ -96,6 +119,15 @@ function createState(file = STATE_PATH) {
 
   function schedule() {
     if (!timer) timer = setTimeout(flush, FLUSH_DELAY_MS);
+  }
+
+  function grade(match, source, score) {
+    const found = replies.posted.find(match);
+    if (!found) return null;
+    const updated = { ...found, [source]: { good: Number(score.good) || 0, bad: Number(score.bad) || 0 } };
+    replies = { ...replies, posted: replies.posted.map((item) => (item === found ? updated : item)) };
+    schedule();
+    return { ...updated };
   }
 
   function flush() {
@@ -218,6 +250,25 @@ function createState(file = STATE_PATH) {
       replies = { ...replies, said };
       schedule();
     },
+    postedReplies() {
+      return replies.posted.map((item) => ({ ...item, chat: { ...item.chat }, note: { ...item.note } }));
+    },
+    notePosted({ id, noteId = null, text = '', at = 0 }) {
+      if (!Number.isInteger(id)) return;
+      const posted = [
+        ...replies.posted.filter((item) => item.id !== id),
+        { id, noteId: Number.isInteger(noteId) ? noteId : null, text, at, chat: { good: 0, bad: 0 }, note: { good: 0, bad: 0 } },
+      ];
+      if (posted.length > POSTED_MEMORY) posted.splice(0, posted.length - POSTED_MEMORY);
+      replies = { ...replies, posted };
+      schedule();
+    },
+    gradeFromChat(id, score) {
+      return grade((item) => item.id === id, 'chat', score);
+    },
+    gradeFromNote(noteId, score) {
+      return grade((item) => item.noteId !== null && item.noteId === noteId, 'note', score);
+    },
     botOffset() {
       return replies.botOffset;
     },
@@ -265,4 +316,4 @@ function createState(file = STATE_PATH) {
   };
 }
 
-module.exports = { createState, STATE_PATH, SENT_MEMORY, ANSWERED_MEMORY, SAID_MEMORY };
+module.exports = { createState, STATE_PATH, SENT_MEMORY, ANSWERED_MEMORY, SAID_MEMORY, POSTED_MEMORY };

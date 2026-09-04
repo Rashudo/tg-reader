@@ -1,7 +1,7 @@
 const path = require('path');
 
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
-const { numFromEnv, hourOrOff, pauseMsFrom, listFromEnv } = require('./env');
+const { numFromEnv, hourOrOff, pauseMsFrom, listFromEnv, listOr } = require('./env');
 
 function required(name) {
   const value = (process.env[name] || '').trim();
@@ -59,6 +59,8 @@ const config = {
     ownerSilenceMin: numFromEnv(process.env.REPLY_OWNER_SILENCE_MIN, 15),
     maxChars: numFromEnv(process.env.REPLY_MAX_CHARS, 160),
     staleAfterMin: numFromEnv(process.env.REPLY_STALE_AFTER_MIN, 10),
+    goodReactions: listOr(process.env.REPLY_GOOD_REACTIONS, ['💯', '👍', '❤', '🔥']),
+    badReactions: listOr(process.env.REPLY_BAD_REACTIONS, ['💩', '👎']),
     ownerCancel: (process.env.REPLY_OWNER_CANCEL || 'answer').trim().toLowerCase() === 'any' ? 'any' : 'answer',
     timeZone: (process.env.NEWS_TZ || 'Europe/Belgrade').trim(),
   },

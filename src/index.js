@@ -1,10 +1,12 @@
 const { NewMessage } = require('telegram/events');
+const { Raw } = require('telegram/events/Raw');
 const { EditedMessage } = require('telegram/events/EditedMessage');
 const { config } = require('./config');
 const { createClient } = require('./client');
 const { readSetup } = require('./preflight');
 const { prepare, summary, unknownGroups } = require('./matcher');
 const { peerKey, eventPeerKey } = require('./peer');
+const { chatReactionOf } = require('./reactions');
 const { createState } = require('./state');
 const { withTimeout } = require('./async');
 const { createWatchdog, createStallWatchdog } = require('./watchdog');
@@ -260,6 +262,7 @@ async function startReplies() {
       minFresh: config.replies.minFresh,
       ownerSilenceMs: config.replies.ownerSilenceMin * 60 * 1000,
     },
+    reactions: { good: config.replies.goodReactions, bad: config.replies.badReactions },
     ownerCancel: config.replies.ownerCancel,
     staleAfterMs: config.replies.staleAfterMin * 60 * 1000,
     log,
@@ -289,6 +292,12 @@ async function startReplies() {
     replier.onMessage(msg).catch((err) => log(`Ответчик споткнулся на сообщении: ${err.message}`));
   }, new NewMessage({}));
 
+  client.addEventHandler((update) => {
+    const event = chatReactionOf(update);
+    if (!event || peerKey(event.peer) !== chatKey) return;
+    replier.onChatReaction(event).catch((err) => log(`Ответчик: реакция чата не учтена (${err.message})`));
+  }, new Raw({}));
+
   setInterval(() => {
     replier.flush().catch((err) => log(`Ответчик: очередь не разобралась (${err.message})`));
   }, REPLY_FLUSH_INTERVAL_MS);
@@ -302,6 +311,7 @@ async function startReplies() {
     chatId: config.alert.chatId,
     state,
     timeZone: config.replies.timeZone,
+    onReaction: (event) => replier.onNoteReaction(event),
     log,
   }).start(BOT_POLL_INTERVAL_MS);
 

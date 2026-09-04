@@ -50,9 +50,19 @@ function rig(over = {}) {
     chat: 'чат',
     state: over.state || fakeState(),
     responder: over.responder || { compose: async () => ({ reply: true, text: 'ага', replyToId: 11 }) },
-    notifier: { send: async (text, options) => alerts.push({ text, ...options }) },
+    notifier: {
+      send: async (text, options) => {
+        alerts.push({ text, ...options });
+        return true;
+      },
+      deliver: async (text, options) => {
+        alerts.push({ text, ...options });
+        return { ok: true, id: 500 + alerts.length };
+      },
+    },
     meId: ME,
     aliases: ['стас'],
+    reactions: { good: ['💯', '👍', '❤', '🔥'], bad: ['💩', '👎'] },
     limits: {
       dailyBudget: 4,
       addressedBudget: 10,
@@ -493,4 +503,81 @@ test('после старта модель сразу знает, что уже 
   clock.advance(5 * MIN);
   await replier.flush();
   assert.deepStrictEqual(seen[0].avoid, ['только на рот парня']);
+});
+
+const { createState } = require('./state');
+const { verdictOf } = require('./reactions');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+
+function realState() {
+  return createState(path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'tg-replier-')), 'state.json'));
+}
+
+async function speakOnce(over = {}) {
+  const kit = rig(over);
+  await kit.replier.onMessage(MINE);
+  await kit.replier.onMessage(ASK);
+  kit.clock.advance(5 * MIN);
+  await kit.replier.flush();
+  return kit;
+}
+
+test('отправленная реплика запоминается вместе с id уведомления', async () => {
+  const state = realState();
+  await speakOnce({ state });
+  const posted = state.postedReplies();
+  assert.strictEqual(posted.length, 1);
+  assert.strictEqual(posted[0].id, 901);
+  assert.strictEqual(posted[0].noteId, 501);
+  assert.strictEqual(posted[0].text, 'ага');
+});
+
+test('реакция в чате отмечает реплику как удачную', async () => {
+  const state = realState();
+  const { replier } = await speakOnce({ state });
+  await replier.onChatReaction({
+    id: 901,
+    results: [{ reaction: { className: 'ReactionEmoji', emoticon: '💯' }, count: 1 }],
+  });
+  assert.strictEqual(verdictOf(state.postedReplies()[0]), 'good');
+});
+
+test('реакция в личке отмечает реплику как неудачную', async () => {
+  const state = realState();
+  const { replier } = await speakOnce({ state });
+  await replier.onNoteReaction({ noteId: 501, reactions: [{ type: 'emoji', emoji: '💩' }] });
+  assert.strictEqual(verdictOf(state.postedReplies()[0]), 'bad');
+});
+
+test('реакция на чужое сообщение никого не задевает', async () => {
+  const state = realState();
+  const { replier } = await speakOnce({ state });
+  await replier.onChatReaction({
+    id: 777,
+    results: [{ reaction: { className: 'ReactionEmoji', emoticon: '💩' }, count: 1 }],
+  });
+  assert.strictEqual(verdictOf(state.postedReplies()[0]), null);
+});
+
+test('оценённые реплики уходят в модель', async () => {
+  const state = realState();
+  const seen = [];
+  const responder = {
+    compose: async (request) => {
+      seen.push(request.graded);
+      return { reply: true, text: 'ага', replyToId: 11 };
+    },
+  };
+  const { replier, clock } = await speakOnce({ state, responder });
+  await replier.onChatReaction({
+    id: 901,
+    results: [{ reaction: { className: 'ReactionEmoji', emoticon: '👍' }, count: 2 }],
+  });
+  clock.advance(10 * MIN);
+  await replier.onMessage({ id: 21, from: 'other', author: 'Тимур', replyTo: 901, text: 'а дальше?' });
+  clock.advance(5 * MIN);
+  await replier.flush();
+  assert.deepStrictEqual(seen[1], { liked: ['ага'], disliked: [] });
 });

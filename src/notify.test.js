@@ -92,3 +92,27 @@ test('без кнопок клавиатура не отправляется', a
   await notifier.send('готово');
   assert.strictEqual(calls[0].reply_markup, undefined);
 });
+
+test('deliver возвращает id отправленного сообщения', async () => {
+  const notifier = createNotifier({
+    token: 'T',
+    chatId: '1',
+    request: async () => ({ ok: true, result: { message_id: 77 } }),
+  });
+  assert.deepStrictEqual(await notifier.deliver('💬 Ответил в чате: ага'), { ok: true, id: 77 });
+});
+
+test('deliver без ответа Bot API не выдумывает id', async () => {
+  const notifier = createNotifier({ token: 'T', chatId: '1', request: async () => ({ ok: true }) });
+  assert.deepStrictEqual(await notifier.deliver('привет'), { ok: true, id: null });
+});
+
+test('deliver при отказе Bot API сообщает о неудаче', async () => {
+  const notifier = createNotifier({
+    token: 'T',
+    chatId: '1',
+    request: async () => ({ ok: false, description: 'chat not found' }),
+    log: () => {},
+  });
+  assert.deepStrictEqual(await notifier.deliver('привет'), { ok: false, id: null });
+});

@@ -1,5 +1,7 @@
 const https = require('https');
 const { localDayOf } = require('./schedule');
+const { verdictOf } = require('./reactions');
+const { cut } = require('./format');
 
 const POLL_TIMEOUT_SEC = 25;
 
@@ -39,6 +41,7 @@ function commandOf(text) {
   if (['старт', 'start', 'говори'].includes(cleaned)) return 'on';
   if (['статус', 'status'].includes(cleaned)) return 'status';
   if (['сброс', 'reset', 'обнули'].includes(cleaned)) return 'reset';
+  if (['оценки', 'scores', 'реакции'].includes(cleaned)) return 'scores';
   return null;
 }
 
@@ -47,6 +50,7 @@ function createBotCommands({
   chatId,
   state,
   request = httpsPostJson,
+  onReaction = () => {},
   timeZone = 'Europe/Belgrade',
   log = console.log,
   now = Date.now,
@@ -58,10 +62,26 @@ function createBotCommands({
     await request(api('sendMessage'), { chat_id: chatId, text, disable_web_page_preview: true });
   }
 
+  function graded() {
+    return (state.postedReplies ? state.postedReplies() : []).map((item) => ({ ...item, verdict: verdictOf(item) }));
+  }
+
   async function statusText() {
     const counters = state.replyCounters(localDayOf(now(), timeZone));
     const head = state.repliesEnabled() ? 'Ответы включены' : 'Ответы выключены';
-    return `${head}. За сутки: на обращения ${counters.addressed}, своих реплик ${counters.spontaneous}.`;
+    const marks = graded();
+    const good = marks.filter((item) => item.verdict === 'good').length;
+    const bad = marks.filter((item) => item.verdict === 'bad').length;
+    const scores = good || bad ? ` Оценки: 👍 ${good}, 👎 ${bad}.` : '';
+    return `${head}. За сутки: на обращения ${counters.addressed}, своих реплик ${counters.spontaneous}.${scores}`;
+  }
+
+  function scoresText() {
+    const marks = graded().slice(-10).reverse();
+    if (!marks.length) return 'Оценок пока нет — бот ещё ничего не отправлял.';
+    const mark = { good: '👍', bad: '👎' };
+    const lines = marks.map((item) => `${mark[item.verdict] || '·'} «${cut(item.text, 70)}»`);
+    return ['Оценки последних реплик:', ...lines].join('\n');
   }
 
   async function apply(command) {
@@ -75,6 +95,10 @@ function createBotCommands({
       state.setRepliesEnabled(true);
       log('Ответчик: включён командой из бота');
       await say('Снова отвечаю.');
+      return;
+    }
+    if (command === 'scores') {
+      await say(scoresText());
       return;
     }
     if (command === 'reset') {
@@ -94,7 +118,7 @@ function createBotCommands({
         response = await request(api('getUpdates'), {
           offset: state.botOffset(),
           timeout: POLL_TIMEOUT_SEC,
-          allowed_updates: ['message', 'callback_query'],
+          allowed_updates: ['message', 'callback_query', 'message_reaction'],
         });
       } catch (err) {
         log(`Бот: не удалось прочитать команды (${err.message})`);
@@ -116,6 +140,17 @@ function createBotCommands({
             await request(api('answerCallbackQuery'), { callback_query_id: query.id, text: 'Молчу' });
           } catch (err) {
             log(`Бот: кнопка не подтверждена (${err.message})`);
+          }
+          continue;
+        }
+
+        if (update.message_reaction) {
+          const event = update.message_reaction;
+          if (!mine(event.chat)) continue;
+          try {
+            await onReaction({ noteId: event.message_id, reactions: event.new_reaction || [] });
+          } catch (err) {
+            log(`Бот: реакция не учтена (${err.message})`);
           }
           continue;
         }
