@@ -195,10 +195,11 @@ test('промпт целиком на «ты», без следов треть�
   assert.ok(!/его пунктуация/i.test(prompt));
 });
 
-test('промпт разрешает развивать тему, запрещая крутить одну формулировку', () => {
+test('промпт ставит прямой ответ выше поддержания темы', () => {
   const prompt = systemPrompt({ samples: [], maxChars: 160, mode: 'addressed', name: 'Стас' });
-  assert.match(prompt, /развивать/i);
+  assert.match(prompt, /ответь по существу/i);
   assert.match(prompt, /той же формулировк|одну и ту же/i);
+  assert.ok(!/можно и нужно/i.test(prompt));
 });
 
 test('на ответ отводится вдвое больше токенов', async () => {
