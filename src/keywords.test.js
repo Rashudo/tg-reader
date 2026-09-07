@@ -32,7 +32,7 @@ test('компьютерная клавиатура за клавишные не
 });
 
 test('слова разложены по группам, которые можно снять целиком', () => {
-  assert.deepStrictEqual(groupNames(keywords), ['Телевизоры', 'Клавишные']);
+  assert.deepStrictEqual(groupNames(keywords), ['Телевизоры', 'Телефоны', 'Клавишные']);
 
   const безКлавишных = prepare(keywords, ['Клавишные']);
   assert.deepStrictEqual(findMatches('Продам синтезатор', безКлавишных), []);
@@ -41,10 +41,42 @@ test('слова разложены по группам, которые можн
   const безТелевизоров = prepare(keywords, ['Телевизоры']);
   assert.deepStrictEqual(findMatches('Продам телевизор', безТелевизоров), []);
   assert.notDeepStrictEqual(findMatches('Продам синтезатор', безТелевизоров), []);
+
+  const безТелефонов = prepare(keywords, ['Телефоны']);
+  assert.deepStrictEqual(findMatches('Продам iPhone 13', безТелефонов), []);
+  assert.notDeepStrictEqual(findMatches('Продам синтезатор', безТелефонов), []);
 });
 
 test('ложные срабатывания, проверенные на 2000 постов, не вернулись', () => {
   assert.deepStrictEqual(hits('ubistvo u Novom Sadu'), []);
   assert.deepStrictEqual(hits('XBox Series X'), []);
   assert.deepStrictEqual(hits('Твердая обложка'), []);
+});
+
+test('объявления о телефонах ловятся по марке', () => {
+  const ads = [
+    'Продам телефон Poco x3 pro 128gb',
+    'Продам Samsung Galaxy S21 Ultra, экран разбит',
+    'Продаю iPhone 13 Pro 128gb в идеальном состоянии',
+    'Продам Huawei p30 pro идеальное состояние 128/6',
+    'Продам Xiaomi 14 в хорошем состоянии, цена 350€',
+    'Продам очень срочно Motorola edge 50 fusion 5g',
+    'Айфон 14 Pro Max, ёмкость аккумулятора 80%',
+    'Redmi Note 12, полный комплект',
+    'Продам смартфон, 128 гб, состояние отличное',
+  ];
+  for (const ad of ads) assert.notDeepStrictEqual(hits(ad), [], `не поймано: ${ad}`);
+});
+
+test('слово «телефон» само по себе объявлением о продаже не считается', () => {
+  const noise = [
+    'Валерия, добро пожаловать в группу. Правила: указывайте цену, район и телефон для связи',
+    'Продам очки с камерами Rayban Meta, управляются с телефона',
+    'Набор для настольного тенниса, штатив для телефона, гантели',
+  ];
+  for (const text of noise) assert.deepStrictEqual(hits(text), [], `ложное срабатывание: ${text}`);
+});
+
+test('сербский гонорар за марку Honor не принимается', () => {
+  assert.deepStrictEqual(hits('Trazim posao, honorar po dogovoru'), []);
 });
