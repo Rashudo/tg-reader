@@ -603,8 +603,15 @@ test('продолжение ветки после одного ответа б�
   assert.strictEqual(replier.pending(), 1);
 });
 
-test('после двух ответов в ветке бот молчит', async () => {
-  const { replier, sent, clock, logs } = rig({ responder: ECHO });
+test('после лимита ветка идёт к модели с оговоркой', async () => {
+  const seen = [];
+  const responder = {
+    compose: async (args) => {
+      seen.push(args);
+      return { reply: true, text: 'ага', replyToId: args.trigger ? args.trigger.id : null };
+    },
+  };
+  const { replier, sent, clock } = rig({ responder });
   await replier.onMessage(MINE);
   await replier.onMessage(ASK);
   clock.advance(6 * MIN);
@@ -615,12 +622,43 @@ test('после двух ответов в ветке бот молчит', asy
   assert.strictEqual(sent.length, 2);
 
   await replier.onMessage(reply(13, 902, 'а если не выйдет'));
-  assert.strictEqual(replier.pending(), 0);
-  assert.ok(logs.some((line) => line.includes('ветк')));
+  assert.strictEqual(replier.pending(), 1);
+  clock.advance(6 * MIN);
+  await replier.flush();
+  assert.strictEqual(seen[2].followUp, 'strict');
+});
+
+test('в исчерпанной ветке решение оставлено модели', async () => {
+  const responder = {
+    compose: async ({ followUp, trigger }) =>
+      followUp === 'strict'
+        ? { reply: false, text: '' }
+        : { reply: true, text: 'ага', replyToId: trigger ? trigger.id : null },
+  };
+  const { replier, sent, clock } = rig({ responder });
+  await replier.onMessage(MINE);
+  await replier.onMessage(ASK);
+  clock.advance(6 * MIN);
+  await replier.flush();
+  await replier.onMessage(reply(12, 901, 'а во сколько тогда'));
+  clock.advance(6 * MIN);
+  await replier.flush();
+
+  await replier.onMessage(reply(13, 902, 'а если не выйдет'));
+  clock.advance(6 * MIN);
+  await replier.flush();
+  assert.strictEqual(sent.length, 2);
 });
 
 test('имя в продолжении ветки считается новым обращением', async () => {
-  const { replier, clock } = rig({ responder: ECHO });
+  const seen = [];
+  const responder = {
+    compose: async (args) => {
+      seen.push(args);
+      return { reply: true, text: 'ага', replyToId: args.trigger ? args.trigger.id : null };
+    },
+  };
+  const { replier, clock } = rig({ responder });
   await replier.onMessage(MINE);
   await replier.onMessage(ASK);
   clock.advance(6 * MIN);
@@ -631,6 +669,9 @@ test('имя в продолжении ветки считается новым 
 
   await replier.onMessage(reply(13, 902, 'стас, ну так что'));
   assert.strictEqual(replier.pending(), 1);
+  clock.advance(6 * MIN);
+  await replier.flush();
+  assert.strictEqual(seen[2].followUp, 'soft');
 });
 
 test('пустое продолжение ветки в очередь не идёт', async () => {
@@ -670,5 +711,5 @@ test('модель знает, что это продолжение ветки',
   await replier.flush();
 
   assert.strictEqual(seen[0].followUp, false);
-  assert.strictEqual(seen[1].followUp, true);
+  assert.strictEqual(seen[1].followUp, 'soft');
 });

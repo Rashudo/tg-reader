@@ -54,6 +54,14 @@ function gradedBlock({ liked = [], disliked = [] } = {}) {
 
 function followUpBlock(followUp) {
   if (!followUp) return '';
+  if (followUp === 'strict') {
+    return [
+      '',
+      'В этой ветке ты уже наговорился. Молчание тут — обычный исход: верни reply: false,',
+      'если только тебе не задали прямой вопрос или не сказали то, на что молчать странно.',
+      '',
+    ].join('\n');
+  }
   return [
     '',
     'Это продолжение ветки, где ты уже отвечал. Второй раз подряд отвечать стоит,',

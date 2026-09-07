@@ -273,8 +273,14 @@ test('compose доносит оценки до модели', async () => {
 });
 
 test('продолжение ветки требует повода, иначе молчание', () => {
-  const prompt = systemPrompt({ samples: [], maxChars: 160, mode: 'addressed', followUp: true });
+  const prompt = systemPrompt({ samples: [], maxChars: 160, mode: 'addressed', followUp: 'soft' });
   assert.match(prompt, /продолжение/i);
+  assert.match(prompt, /reply: false/);
+});
+
+test('исчерпанная ветка требует прямого вопроса', () => {
+  const prompt = systemPrompt({ samples: [], maxChars: 160, mode: 'addressed', followUp: 'strict' });
+  assert.match(prompt, /наговорился/i);
   assert.match(prompt, /reply: false/);
 });
 
@@ -292,6 +298,6 @@ test('признак продолжения доходит от ответчик
     },
     samples: [],
   });
-  await responder.compose({ window: WINDOW, trigger: null, mode: 'addressed', followUp: true });
+  await responder.compose({ window: WINDOW, trigger: null, mode: 'addressed', followUp: 'soft' });
   assert.match(seen[0].system, /продолжение/i);
 });

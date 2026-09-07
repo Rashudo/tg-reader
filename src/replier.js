@@ -177,19 +177,17 @@ function createReplier({
       if (queue.some((item) => item.trigger.id === msg.id)) return;
 
       const turns = turnsBefore(msg);
-      if (!mentionsAlias(text, aliases)) {
-        if (turns >= limits.threadLimit) {
-          log(`Ответчик: в ветке ${msg.id} уже ответил дважды — молчу`);
-          return;
-        }
-        if (turns > 0 && isFiller(text)) {
-          log(`Ответчик: пустое продолжение ${msg.id} — молчу`);
-          return;
-        }
+      const named = mentionsAlias(text, aliases);
+      if (!named && turns > 0 && isFiller(text)) {
+        log(`Ответчик: пустое продолжение ${msg.id} — молчу`);
+        return;
       }
 
-      queue.push({ trigger: { ...msg, text }, queuedAt: now(), dueAt: now() + delayMs(), followUp: turns > 0 });
-      log(`Ответчик: обращение ${msg.id} в очереди`);
+      let followUp = false;
+      if (turns > 0) followUp = !named && turns >= limits.threadLimit ? 'strict' : 'soft';
+
+      queue.push({ trigger: { ...msg, text }, queuedAt: now(), dueAt: now() + delayMs(), followUp });
+      log(`Ответчик: обращение ${msg.id} в очереди${followUp === 'strict' ? ' (в ветке уже наговорился)' : ''}`);
     },
 
     async flush() {
@@ -222,7 +220,7 @@ function createReplier({
           continue;
         }
         try {
-          await speak({ mode: 'addressed', trigger: item.trigger, followUp: Boolean(item.followUp) });
+          await speak({ mode: 'addressed', trigger: item.trigger, followUp: item.followUp || false });
         } catch (err) {
           log(`Ответчик: ответ не сложился (${err.message}) — молчу`);
         }
