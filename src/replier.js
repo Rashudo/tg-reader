@@ -1,6 +1,7 @@
 const { isAddressed, mentionsAlias, decideAddressed, decideSpontaneous } = require('./reply-rules');
 const { botTurns, isFiller } = require('./thread');
 const { chatText } = require('./media');
+const { freshMemes, sampleMemes, titleOf } = require('./memes');
 const { repeatsRecent } = require('./repetition');
 const { emojiCounts, emojiVotes, tally, verdictOf } = require('./reactions');
 const { localDayOf } = require('./schedule');
@@ -8,6 +9,7 @@ const { localDayOf } = require('./schedule');
 const GRADED_SHOWN = 5;
 
 const OFF_BUTTON = [[{ text: 'Больше не отвечать', data: 'replies:off' }]];
+const MEME_BUTTONS = [[{ text: 'Больше не отвечать', data: 'replies:off' }], [{ text: 'Без картинок', data: 'memes:off' }]];
 
 function createReplier({
   client,
@@ -15,6 +17,7 @@ function createReplier({
   state,
   responder,
   notifier,
+  memes = null,
   meId,
   aliases = [],
   limits,
@@ -71,9 +74,19 @@ function createReplier({
     return botTurns(msg, { messageById: byId, mine: (parent) => own.has(parent.id) });
   }
 
+  function memesOnOffer() {
+    if (!memes || !state.memesEnabled || !state.memesEnabled()) return [];
+    const ready = freshMemes(memes.available(), state.recentMemes ? state.recentMemes() : [], {
+      now: now(),
+      cooldownMs: limits.memeCooldownMs || 0,
+    });
+    return sampleMemes(ready, limits.memeChoices, random);
+  }
+
   async function speak({ mode, trigger, followUp = false }) {
     const said = state.recentReplies();
     const composed = await responder.compose({
+      memes: memesOnOffer(),
       avoid: said,
       graded: graded(),
       window: window.map((msg) => ({
@@ -91,20 +104,26 @@ function createReplier({
       return false;
     }
 
-    if (repeatsRecent(composed.text, said.slice(-echoGuard))) {
+    const meme = composed.meme || null;
+
+    if (!meme && repeatsRecent(composed.text, said.slice(-echoGuard))) {
       log(`Ответчик: повтор недавней шутки — молчу («${composed.text}»)`);
       return false;
     }
 
-    const posted = await client.sendMessage(chat, {
-      message: composed.text,
-      ...(composed.replyToId ? { replyTo: composed.replyToId } : {}),
-      parseMode: false,
-    });
+    const posted = meme
+      ? await memes.send({ id: meme.id, replyTo: composed.replyToId || null })
+      : await client.sendMessage(chat, {
+          message: composed.text,
+          ...(composed.replyToId ? { replyTo: composed.replyToId } : {}),
+          parseMode: false,
+        });
 
-    state.noteSaid(composed.text);
+    const shown = meme ? `[${titleOf(meme)}]` : composed.text;
+    if (!meme) state.noteSaid(composed.text);
 
     const at = now();
+    if (meme && state.noteMemeSent) state.noteMemeSent(meme.id, at);
     if (posted && Number.isInteger(posted.id)) {
       own.add(posted.id);
       remember({
@@ -112,16 +131,19 @@ function createReplier({
         from: String(meId),
         author: 'ты',
         replyTo: composed.replyToId || null,
-        text: composed.text,
+        text: shown,
       });
     }
 
     if (trigger) state.noteAnswered(trigger.id);
     state.noteReply(mode === 'addressed' ? 'addressed' : 'spontaneous', at, localDayOf(at, limits.quiet.timeZone));
-    log(`Ответчик: отправлено (${mode}) — ${composed.text}`);
-    const note = await notifier.deliver(`💬 Ответил в чате: ${composed.text}`, { buttons: OFF_BUTTON });
+    log(`Ответчик: отправлено (${mode}) — ${meme ? `${titleOf(meme)}: ${meme.note}` : composed.text}`);
+    const note = await notifier.deliver(
+      meme ? `🖼 Отправил в чат ${titleOf(meme)}: ${meme.note}` : `💬 Ответил в чате: ${composed.text}`,
+      { buttons: meme ? MEME_BUTTONS : OFF_BUTTON }
+    );
     if (posted && Number.isInteger(posted.id) && state.notePosted) {
-      state.notePosted({ id: posted.id, noteId: (note && note.id) || null, text: composed.text, at });
+      state.notePosted({ id: posted.id, noteId: (note && note.id) || null, text: shown, at });
     }
     return true;
   }

@@ -376,3 +376,29 @@ test('состояние без раздела оценок читается к�
   assert.deepStrictEqual(s.postedReplies(), []);
   assert.deepStrictEqual(s.recentReplies(), ['привет']);
 });
+
+test('мемы включены, пока их не выключили', () => {
+  const file = tmpFile();
+  const state = createState(file);
+  assert.strictEqual(state.memesEnabled(), true);
+  state.setMemesEnabled(false);
+  assert.strictEqual(state.memesEnabled(), false);
+});
+
+test('выключенные мемы переживают перезапуск', async () => {
+  const file = tmpFile();
+  const first = createState(file);
+  first.setMemesEnabled(false);
+  first.noteMemeSent('m1', 1234);
+  first.flush();
+  const second = createState(file);
+  assert.strictEqual(second.memesEnabled(), false);
+  assert.deepStrictEqual(second.recentMemes(), [{ id: 'm1', at: 1234 }]);
+});
+
+test('повторная отправка картинки обновляет отметку времени', () => {
+  const state = createState(tmpFile());
+  state.noteMemeSent('m1', 100);
+  state.noteMemeSent('m1', 500);
+  assert.deepStrictEqual(state.recentMemes(), [{ id: 'm1', at: 500 }]);
+});

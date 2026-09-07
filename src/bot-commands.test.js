@@ -6,6 +6,7 @@ function fakeState() {
   let enabled = true;
   let offset = 0;
   let posted = [];
+  let memesOn = true;
   return {
     repliesEnabled: () => enabled,
     setRepliesEnabled: (on) => {
@@ -17,6 +18,10 @@ function fakeState() {
     },
     replyCounters: () => ({ addressed: 2, spontaneous: 1, lastAddressedAt: 0, lastSpontaneousAt: 0 }),
     postedReplies: () => posted,
+    memesEnabled: () => memesOn,
+    setMemesEnabled: (on) => {
+      memesOn = on;
+    },
     setPosted: (items) => {
       posted = items;
     },
@@ -219,4 +224,41 @@ test('статус подсчитывает оценки', async () => {
   await bot.poll();
   const said = calls.find((call) => call.url.includes('sendMessage')).body.text;
   assert.match(said, /Оценки: 👍 1, 👎 1/);
+});
+
+test('«мемы стоп» выключает картинки, «мемы старт» возвращает', async () => {
+  const { bot, state } = rig([
+    { update_id: 1, message: { text: 'мемы стоп', chat: { id: 7 } } },
+  ]);
+  await bot.poll();
+  assert.strictEqual(state.memesEnabled(), false);
+
+  const back = rig([{ update_id: 2, message: { text: 'мемы старт', chat: { id: 7 } } }], { state });
+  await back.bot.poll();
+  assert.strictEqual(state.memesEnabled(), true);
+});
+
+test('«мемы» переключает состояние', async () => {
+  const { bot, state } = rig([{ update_id: 1, message: { text: 'мемы', chat: { id: 7 } } }]);
+  await bot.poll();
+  assert.strictEqual(state.memesEnabled(), false);
+});
+
+test('кнопка под картинкой выключает только картинки', async () => {
+  const { bot, state, calls } = rig([
+    { update_id: 1, callback_query: { id: 'c1', data: 'memes:off', message: { chat: { id: 7 } } } },
+  ]);
+  await bot.poll();
+  assert.strictEqual(state.memesEnabled(), false);
+  assert.strictEqual(state.repliesEnabled(), true);
+  const answered = calls.find((call) => call.url.includes('answerCallbackQuery'));
+  assert.match(answered.body.text, /картинок/i);
+});
+
+test('статус говорит и про картинки', async () => {
+  const { bot, state, calls } = rig([{ update_id: 1, message: { text: 'статус', chat: { id: 7 } } }]);
+  state.setMemesEnabled(false);
+  await bot.poll();
+  const said = calls.find((call) => call.url.includes('sendMessage'));
+  assert.match(said.body.text, /Картинки выключены/);
 });

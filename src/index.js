@@ -7,6 +7,8 @@ const { readSetup } = require('./preflight');
 const { prepare, summary, unknownGroups } = require('./matcher');
 const { peerKey, eventPeerKey } = require('./peer');
 const { describeMedia } = require('./media');
+const { loadMemes } = require('./memes');
+const { createMemeSender } = require('./meme-sender');
 const { chatReactionOf } = require('./reactions');
 const { createState } = require('./state');
 const { withTimeout } = require('./async');
@@ -30,6 +32,7 @@ const DIGEST_CHECK_INTERVAL_MS = 10 * 60 * 1000;
 const REPLY_FLUSH_INTERVAL_MS = 10 * 1000;
 const REPLY_TICK_INTERVAL_MS = 25 * 60 * 1000;
 const BOT_POLL_INTERVAL_MS = 30 * 1000;
+const MEME_REFRESH_MS = 60 * 60 * 1000;
 const STALL_RECONNECT_MS = config.health.stallReconnectMin * 60 * 1000;
 const STALL_GIVEUP_MS = config.health.stallGiveUpMin * 60 * 1000;
 
@@ -241,10 +244,25 @@ async function startReplies() {
     log('Автоответы: образцов речи нет, ответы будут безликими — соберите voice.json');
   }
 
+  const catalogue = config.replies.memes ? loadMemes() : [];
+  let memes = null;
+  if (catalogue.length) {
+    memes = createMemeSender({ client, chat, catalogue, log });
+    const ready = await memes.refresh();
+    log(`Картинки: в каталоге ${catalogue.length}, под рукой ${ready}, ${state.memesEnabled() ? 'включены' : 'выключены'}`);
+    const refresher = setInterval(() => {
+      memes.refresh().catch((err) => log(`Картинки: обновление сорвалось (${err.message})`));
+    }, MEME_REFRESH_MS);
+    if (refresher.unref) refresher.unref();
+  } else if (config.replies.memes) {
+    log('Картинки: каталога нет, отправлять нечего — соберите memes.json (npm run memes)');
+  }
+
   const replier = createReplier({
     client,
     chat,
     state,
+    memes,
     responder: createResponder({
       model: config.replies.model,
       createMessage: news.createAnthropicCall(config.anthropicKey),
@@ -268,6 +286,8 @@ async function startReplies() {
       minFresh: config.replies.minFresh,
       ownerSilenceMs: config.replies.ownerSilenceMin * 60 * 1000,
       threadLimit: config.replies.threadLimit,
+      memeChoices: config.replies.memeChoices,
+      memeCooldownMs: config.replies.memeCooldownH * 60 * 60 * 1000,
     },
     reactions: { good: config.replies.goodReactions, bad: config.replies.badReactions },
     ownerCancel: config.replies.ownerCancel,

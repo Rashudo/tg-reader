@@ -7,6 +7,7 @@ const SENT_MEMORY = 300;
 const ANSWERED_MEMORY = 500;
 const SAID_MEMORY = 8;
 const POSTED_MEMORY = 40;
+const MEMES_MEMORY = 60;
 const SERVICE_KEY = '_service';
 
 function read(file) {
@@ -64,6 +65,17 @@ function normalizePosted(value) {
   };
 }
 
+function normalizeMemes(value) {
+  const memes = value && typeof value === 'object' ? value : {};
+  const used = Array.isArray(memes.used) ? memes.used : [];
+  return {
+    enabled: memes.enabled !== false,
+    used: used
+      .filter((item) => item && typeof item.id === 'string' && item.id)
+      .map((item) => ({ id: item.id, at: Number.isInteger(item.at) ? item.at : 0 })),
+  };
+}
+
 function normalizeReplies(value) {
   const empty = {
     enabled: true,
@@ -76,6 +88,7 @@ function normalizeReplies(value) {
     said: [],
     posted: [],
     botOffset: 0,
+    memes: { enabled: true, used: [] },
   };
   if (!value || typeof value !== 'object') return empty;
   return {
@@ -89,6 +102,7 @@ function normalizeReplies(value) {
     said: Array.isArray(value.said) ? value.said.filter((item) => typeof item === 'string') : [],
     posted: Array.isArray(value.posted) ? value.posted.map(normalizePosted).filter(Boolean) : [],
     botOffset: Number.isInteger(value.botOffset) ? value.botOffset : 0,
+    memes: normalizeMemes(value.memes),
   };
 }
 
@@ -206,6 +220,23 @@ function createState(file = STATE_PATH) {
     },
     setRepliesEnabled(on) {
       replies = { ...replies, enabled: Boolean(on) };
+      schedule();
+    },
+    memesEnabled() {
+      return replies.memes.enabled !== false;
+    },
+    setMemesEnabled(on) {
+      replies = { ...replies, memes: { ...replies.memes, enabled: Boolean(on) } };
+      schedule();
+    },
+    recentMemes() {
+      return replies.memes.used.map((item) => ({ ...item }));
+    },
+    noteMemeSent(id, at) {
+      if (typeof id !== 'string' || !id) return;
+      const used = [...replies.memes.used.filter((item) => item.id !== id), { id, at: Number.isInteger(at) ? at : 0 }];
+      if (used.length > MEMES_MEMORY) used.splice(0, used.length - MEMES_MEMORY);
+      replies = { ...replies, memes: { ...replies.memes, used } };
       schedule();
     },
     replyCounters(day) {

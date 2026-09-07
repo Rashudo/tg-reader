@@ -345,3 +345,45 @@ test('правила требуют простой речи и знака воп
   assert.match(prompt, /прост/i);
   assert.match(prompt, /знаком вопроса/i);
 });
+
+const CATALOGUE = [{ id: 'm1', kind: 'gif', emoji: '', note: 'мужик закатывает глаза' }];
+
+test('каталог картинок попадает в промпт', () => {
+  const prompt = systemPrompt({ samples: [], maxChars: 160, mode: 'addressed', memes: CATALOGUE });
+  assert.match(prompt, /m1: гифка — мужик закатывает глаза/);
+});
+
+test('без каталога промпт про картинки молчит', () => {
+  const prompt = systemPrompt({ samples: [], maxChars: 160, mode: 'addressed' });
+  assert.ok(!/под рукой/.test(prompt));
+});
+
+test('выбранная картинка возвращается вместо текста', async () => {
+  const responder = createResponder({
+    createMessage: async () => answer({ reply: true, text: '', meme: 'm1', question: false }),
+    samples: [],
+  });
+  const out = await responder.compose({ window: WINDOW, trigger: { id: 7, author: 'Тимур', text: 'ну как' }, mode: 'addressed', memes: CATALOGUE });
+  assert.strictEqual(out.meme.id, 'm1');
+  assert.strictEqual(out.text, '');
+  assert.strictEqual(out.replyToId, 7);
+});
+
+test('выдуманный id картинки отбрасывается', async () => {
+  const responder = createResponder({
+    createMessage: async () => answer({ reply: true, text: 'ну да', meme: 'm9', question: false }),
+    samples: [],
+  });
+  const out = await responder.compose({ window: WINDOW, trigger: null, mode: 'spontaneous', memes: CATALOGUE });
+  assert.strictEqual(out.meme, null);
+  assert.strictEqual(out.text, 'ну да');
+});
+
+test('картинка без текста молчанием не считается', async () => {
+  const responder = createResponder({
+    createMessage: async () => answer({ reply: true, text: '   ', meme: 'm1', question: false }),
+    samples: [],
+  });
+  const out = await responder.compose({ window: WINDOW, trigger: null, mode: 'spontaneous', memes: CATALOGUE });
+  assert.strictEqual(out.reply, true);
+});

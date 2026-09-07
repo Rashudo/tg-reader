@@ -13,7 +13,8 @@
     "alert-setup": "node src/alert-setup.js",
     "test": "node --test src/*.test.js",
     "replies": "node src/replies-cli.js",
-    "voice": "node bin/export-voice.js"
+    "voice": "node bin/export-voice.js",
+    "memes": "node bin/index-memes.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0",

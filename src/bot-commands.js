@@ -42,6 +42,9 @@ function commandOf(text) {
   if (['статус', 'status'].includes(cleaned)) return 'status';
   if (['сброс', 'reset', 'обнули'].includes(cleaned)) return 'reset';
   if (['оценки', 'scores', 'реакции'].includes(cleaned)) return 'scores';
+  if (['мемы стоп', 'картинки стоп', 'без картинок', 'memes off'].includes(cleaned)) return 'memes-off';
+  if (['мемы старт', 'картинки старт', 'memes on'].includes(cleaned)) return 'memes-on';
+  if (['мемы', 'картинки', 'memes'].includes(cleaned)) return 'memes';
   return null;
 }
 
@@ -73,7 +76,8 @@ function createBotCommands({
     const good = marks.filter((item) => item.verdict === 'good').length;
     const bad = marks.filter((item) => item.verdict === 'bad').length;
     const scores = good || bad ? ` Оценки: 👍 ${good}, 👎 ${bad}.` : '';
-    return `${head}. За сутки: на обращения ${counters.addressed}, своих реплик ${counters.spontaneous}.${scores}`;
+    const memes = state.memesEnabled ? ` Картинки ${state.memesEnabled() ? 'включены' : 'выключены'}.` : '';
+    return `${head}. За сутки: на обращения ${counters.addressed}, своих реплик ${counters.spontaneous}.${memes}${scores}`;
   }
 
   function scoresText() {
@@ -95,6 +99,17 @@ function createBotCommands({
       state.setRepliesEnabled(true);
       log('Ответчик: включён командой из бота');
       await say('Снова отвечаю.');
+      return;
+    }
+    if (command === 'memes-off' || command === 'memes-on' || command === 'memes') {
+      if (!state.setMemesEnabled) {
+        await say('Картинки в этой сборке не настроены.');
+        return;
+      }
+      const on = command === 'memes' ? !state.memesEnabled() : command === 'memes-on';
+      state.setMemesEnabled(on);
+      log(`Картинки: ${on ? 'включены' : 'выключены'} командой из бота`);
+      await say(on ? 'Картинки снова в ходу. Выключить — «мемы стоп».' : 'Больше без картинок. Вернуть — «мемы старт».');
       return;
     }
     if (command === 'scores') {
@@ -132,12 +147,18 @@ function createBotCommands({
         if (update.callback_query) {
           const query = update.callback_query;
           if (!mine(query.message && query.message.chat)) continue;
+          let answer = 'Молчу';
           if (query.data === 'replies:off') {
             state.setRepliesEnabled(false);
             log('Ответчик: выключен кнопкой');
           }
+          if (query.data === 'memes:off' && state.setMemesEnabled) {
+            state.setMemesEnabled(false);
+            answer = 'Без картинок';
+            log('Картинки: выключены кнопкой');
+          }
           try {
-            await request(api('answerCallbackQuery'), { callback_query_id: query.id, text: 'Молчу' });
+            await request(api('answerCallbackQuery'), { callback_query_id: query.id, text: answer });
           } catch (err) {
             log(`Бот: кнопка не подтверждена (${err.message})`);
           }

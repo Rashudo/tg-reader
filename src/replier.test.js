@@ -8,6 +8,7 @@ const MIN = 60 * 1000;
 
 function fakeState() {
   let enabled = true;
+  const memes = { enabled: true, used: [] };
   const said = [];
   const answered = new Set();
   const counters = { addressed: 0, spontaneous: 0, lastAddressedAt: 0, lastSpontaneousAt: 0 };
@@ -25,6 +26,12 @@ function fakeState() {
     noteAnswered: (id) => answered.add(id),
     recentReplies: () => [...said],
     noteSaid: (text) => said.push(text),
+    memesEnabled: () => memes.enabled,
+    setMemesEnabled: (on) => {
+      memes.enabled = on;
+    },
+    recentMemes: () => [...memes.used],
+    noteMemeSent: (id, at) => memes.used.push({ id, at }),
   };
 }
 
@@ -49,6 +56,7 @@ function rig(over = {}) {
     },
     chat: 'чат',
     state: over.state || fakeState(),
+    memes: over.memes === undefined ? null : over.memes,
     responder: over.responder || { compose: async () => ({ reply: true, text: 'ага', replyToId: 11 }) },
     notifier: {
       send: async (text, options) => {
@@ -75,6 +83,8 @@ function rig(over = {}) {
       minFresh: 5,
       ownerSilenceMs: 15 * MIN,
       threadLimit: 2,
+      memeChoices: 40,
+      memeCooldownMs: 72 * 60 * 60 * 1000,
     },
     log: (line) => logs.push(line),
     now: () => now,
@@ -741,4 +751,84 @@ test('подпись под фото — обычное обращение', asy
 
   await replier.onMessage({ id: 32, from: 'other', author: 'Тимур', replyTo: 901, text: 'это оно?', media: 'фото' });
   assert.strictEqual(replier.pending(), 1);
+});
+
+const MEMES = [{ id: 'm1', kind: 'gif', emoji: '', note: 'мужик закатывает глаза' }];
+
+function memeRig(over = {}) {
+  const shots = [];
+  const memes = {
+    available: () => MEMES,
+    send: async ({ id, replyTo }) => {
+      shots.push({ id, replyTo });
+      return { id: 950 };
+    },
+  };
+  const offered = [];
+  const responder = {
+    compose: async (args) => {
+      offered.push(args.memes);
+      return over.answer ? over.answer(args) : { reply: true, text: '', meme: MEMES[0], replyToId: args.trigger ? args.trigger.id : null };
+    },
+  };
+  const state = over.state;
+  return { ...rig({ responder, memes, ...(state ? { state } : {}) }), shots, offered, memes };
+}
+
+test('каталог картинок предлагается модели', async () => {
+  const { replier, offered, clock } = memeRig();
+  await replier.onMessage(MINE);
+  await replier.onMessage(ASK);
+  clock.advance(6 * MIN);
+  await replier.flush();
+  assert.deepStrictEqual(offered[0], MEMES);
+});
+
+test('выбранная картинка уходит файлом, а не текстом', async () => {
+  const { replier, shots, sent, clock, alerts } = memeRig();
+  await replier.onMessage(MINE);
+  await replier.onMessage(ASK);
+  clock.advance(6 * MIN);
+  await replier.flush();
+
+  assert.deepStrictEqual(shots, [{ id: 'm1', replyTo: 11 }]);
+  assert.strictEqual(sent.length, 0);
+  assert.match(alerts.at(-1).text, /гифка/);
+  assert.ok(alerts.at(-1).buttons.some((row) => row.some((button) => button.data === 'memes:off')));
+});
+
+test('отправленная картинка попадает в окно пометкой', async () => {
+  const { replier, clock } = memeRig();
+  await replier.onMessage(MINE);
+  await replier.onMessage(ASK);
+  clock.advance(6 * MIN);
+  await replier.flush();
+  assert.strictEqual(replier.window().at(-1).text, '[гифка]');
+});
+
+test('выключенные картинки модели не предлагаются', async () => {
+  const state = fakeState();
+  state.setMemesEnabled(false);
+  const { replier, offered, clock } = memeRig({
+    state,
+    answer: ({ trigger }) => ({ reply: true, text: 'ага', meme: null, replyToId: trigger ? trigger.id : null }),
+  });
+  await replier.onMessage(MINE);
+  await replier.onMessage(ASK);
+  clock.advance(6 * MIN);
+  await replier.flush();
+  assert.deepStrictEqual(offered[0], []);
+});
+
+test('свежеотправленная картинка второй раз не предлагается', async () => {
+  const { replier, offered, clock } = memeRig();
+  await replier.onMessage(MINE);
+  await replier.onMessage(ASK);
+  clock.advance(6 * MIN);
+  await replier.flush();
+
+  await replier.onMessage(reply(20, 950, 'ну ты понял'));
+  clock.advance(6 * MIN);
+  await replier.flush();
+  assert.deepStrictEqual(offered[1], []);
 });

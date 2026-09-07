@@ -1,4 +1,5 @@
 const { estimateCost } = require('./summarizer');
+const { catalogueBlock, pickMeme } = require('./memes');
 
 const DEFAULT_MODEL = 'claude-opus-4-8';
 const MAX_TOKENS = 1200;
@@ -10,6 +11,7 @@ const SCHEMA = {
     reply: { type: 'boolean' },
     text: { type: 'string' },
     question: { type: 'boolean' },
+    meme: { type: ['string', 'null'] },
     replyToId: { type: ['integer', 'null'] },
   },
   required: ['reply', 'text', 'question'],
@@ -90,6 +92,7 @@ function systemPrompt({
   avoid = [],
   graded = {},
   followUp = false,
+  memes = [],
 }) {
   const task =
     mode === 'addressed'
@@ -110,6 +113,7 @@ function systemPrompt({
     '',
     ...task,
     followUpBlock(followUp),
+    catalogueBlock(memes),
     voiceBlock(samples),
     gradedBlock(graded),
     avoidBlock(avoid),
@@ -150,7 +154,7 @@ function textOf(response) {
   return block ? block.text : '';
 }
 
-const SILENCE = { reply: false, text: '', replyToId: null };
+const SILENCE = { reply: false, text: '', meme: null, replyToId: null };
 
 function createResponder({
   model = DEFAULT_MODEL,
@@ -161,11 +165,11 @@ function createResponder({
   log = console.log,
 }) {
   return {
-    async compose({ window, trigger, mode, avoid = [], graded = {}, followUp = false }) {
+    async compose({ window, trigger, mode, avoid = [], graded = {}, followUp = false, memes = [] }) {
       const response = await createMessage({
         model,
         max_tokens: MAX_TOKENS,
-        system: systemPrompt({ samples, maxChars, mode, name, avoid, graded, followUp }),
+        system: systemPrompt({ samples, maxChars, mode, name, avoid, graded, followUp, memes }),
         messages: [{ role: 'user', content: buildUserMessage({ window, trigger }) }],
         output_config: { format: { type: 'json_schema', schema: SCHEMA } },
       });
@@ -188,8 +192,9 @@ function createResponder({
       }
 
       if (!parsed || parsed.reply !== true) return SILENCE;
+      const meme = pickMeme(memes, parsed.meme);
       const text = ensureQuestion(clampText(String(parsed.text || ''), maxChars), parsed.question === true);
-      if (!text) return SILENCE;
+      if (!text && !meme) return SILENCE;
 
       const known = new Set(window.map((msg) => msg.id));
       let replyToId = trigger ? trigger.id : null;
@@ -197,7 +202,8 @@ function createResponder({
         replyToId = Number.isInteger(parsed.replyToId) && known.has(parsed.replyToId) ? parsed.replyToId : null;
       }
 
-      return { reply: true, text, replyToId };
+      if (meme) return { reply: true, text: '', meme, replyToId };
+      return { reply: true, text, meme: null, replyToId };
     },
   };
 }
