@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { createResponder, systemPrompt, clampText } = require('./responder');
+const { createResponder, systemPrompt, clampText, ensureQuestion, SCHEMA } = require('./responder');
 
 function answer(payload) {
   return { content: [{ type: 'text', text: JSON.stringify(payload) }], usage: {} };
@@ -300,4 +300,48 @@ test('признак продолжения доходит от ответчик
   });
   await responder.compose({ window: WINDOW, trigger: null, mode: 'addressed', followUp: 'soft' });
   assert.match(seen[0].system, /продолжение/i);
+});
+
+test('вопрос без знака его получает', () => {
+  assert.strictEqual(ensureQuestion('а ты идёшь', true), 'а ты идёшь?');
+});
+
+test('утверждение знаком вопроса не обрастает', () => {
+  assert.strictEqual(ensureQuestion('да я и не собирался', false), 'да я и не собирался');
+});
+
+test('второй знак вопроса не приписывается', () => {
+  assert.strictEqual(ensureQuestion('а ты идёшь?', true), 'а ты идёшь?');
+});
+
+test('точка в конце вопроса меняется на знак вопроса', () => {
+  assert.strictEqual(ensureQuestion('и чо теперь.', true), 'и чо теперь?');
+});
+
+test('смайлик в хвосте вопроса остаётся на месте', () => {
+  assert.strictEqual(ensureQuestion('и чо теперь )', true), 'и чо теперь? )');
+});
+
+test('пустой текст остаётся пустым', () => {
+  assert.strictEqual(ensureQuestion('', true), '');
+});
+
+test('схема спрашивает модель, вопрос ли это', () => {
+  assert.ok(SCHEMA.properties.question);
+  assert.ok(SCHEMA.required.includes('question'));
+});
+
+test('признак вопроса доходит до отправленного текста', async () => {
+  const responder = createResponder({
+    createMessage: async () => answer({ reply: true, text: 'а во сколько', question: true }),
+    samples: [],
+  });
+  const out = await responder.compose({ window: WINDOW, trigger: { id: 7, author: 'Тимур', text: 'встречаемся' }, mode: 'addressed' });
+  assert.strictEqual(out.text, 'а во сколько?');
+});
+
+test('правила требуют простой речи и знака вопроса', () => {
+  const prompt = systemPrompt({ samples: [], maxChars: 160, mode: 'addressed' });
+  assert.match(prompt, /прост/i);
+  assert.match(prompt, /знаком вопроса/i);
 });

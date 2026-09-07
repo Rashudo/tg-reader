@@ -9,9 +9,10 @@ const SCHEMA = {
   properties: {
     reply: { type: 'boolean' },
     text: { type: 'string' },
+    question: { type: 'boolean' },
     replyToId: { type: ['integer', 'null'] },
   },
-  required: ['reply', 'text'],
+  required: ['reply', 'text', 'question'],
   additionalProperties: false,
 };
 
@@ -22,6 +23,16 @@ function clampText(text, maxChars) {
   const stop = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '));
   if (stop > maxChars / 3) return cut.slice(0, stop + 1).trim();
   return cut;
+}
+
+function ensureQuestion(text, question) {
+  if (!question) return text;
+  const trimmed = String(text || '').trim();
+  if (!trimmed) return trimmed;
+  const tail = trimmed.match(/(?:[)(\s]|\p{Extended_Pictographic})*$/u)[0];
+  const core = trimmed.slice(0, trimmed.length - tail.length).replace(/[\s.,;:!…]+$/u, '');
+  if (!core || core.endsWith('?')) return trimmed;
+  return `${core}?${tail}`;
 }
 
 function voiceBlock(samples) {
@@ -106,6 +117,10 @@ function systemPrompt({
     `— одна фраза, не длиннее ${maxChars} символов; длинная складная реплика выдаёт подделку вернее всего;`,
     '— строчные буквы и твоя пунктуация, а не грамотная письменная речь;',
     '— без вступлений, без «конечно», без извинений, без объяснения шутки;',
+    '— говори просто: обычные слова, короткое предложение, чаще всего три-десять слов;',
+    '— никаких придаточных, «то есть», «выходит, что» и переформулировок чужой мысли;',
+    '— не собирай остроту из двух частей через запятую: сказал по делу — и хватит;',
+    '— спрашиваешь — заканчивай знаком вопроса и ставь question: true;',
     '— не переспрашивай и не предлагай помощь: это чат друзей, а не поддержка;',
     '— эмодзи только такие и настолько же редко, как в образцах;',
     `— пиши от первого лица; никогда не говори о себе в третьем лице и не называй себя «${name}»;`,
@@ -173,7 +188,7 @@ function createResponder({
       }
 
       if (!parsed || parsed.reply !== true) return SILENCE;
-      const text = clampText(String(parsed.text || ''), maxChars);
+      const text = ensureQuestion(clampText(String(parsed.text || ''), maxChars), parsed.question === true);
       if (!text) return SILENCE;
 
       const known = new Set(window.map((msg) => msg.id));
@@ -187,4 +202,4 @@ function createResponder({
   };
 }
 
-module.exports = { createResponder, systemPrompt, clampText, gradedBlock, followUpBlock, SCHEMA };
+module.exports = { createResponder, systemPrompt, clampText, ensureQuestion, gradedBlock, followUpBlock, SCHEMA };
