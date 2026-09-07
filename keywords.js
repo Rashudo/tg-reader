@@ -35,8 +35,6 @@ module.exports = [
   {
     group: 'Телефоны',
     words: [
-      'iphone',
-      'айфон',
       'samsung',
       'самсунг',
       'xiaomi',
