@@ -713,3 +713,32 @@ test('модель знает, что это продолжение ветки',
   assert.strictEqual(seen[0].followUp, false);
   assert.strictEqual(seen[1].followUp, 'soft');
 });
+
+test('чужой стикер виден в окне как пометка', async () => {
+  const { replier } = rig();
+  await replier.onMessage({ id: 30, from: 'other', author: 'Тимур', replyTo: null, text: '', media: 'стикер 😂' });
+  assert.strictEqual(replier.window().at(-1).text, '[стикер 😂]');
+});
+
+test('голый стикер в ответ боту ответа не требует', async () => {
+  const { replier, clock } = rig({ responder: ECHO });
+  await replier.onMessage(MINE);
+  await replier.onMessage(ASK);
+  clock.advance(6 * MIN);
+  await replier.flush();
+
+  await replier.onMessage({ id: 31, from: 'other', author: 'Тимур', replyTo: 901, text: '', media: 'стикер 😂' });
+  assert.strictEqual(replier.pending(), 0);
+  assert.strictEqual(replier.window().at(-1).text, '[стикер 😂]');
+});
+
+test('подпись под фото — обычное обращение', async () => {
+  const { replier, clock } = rig({ responder: ECHO });
+  await replier.onMessage(MINE);
+  await replier.onMessage(ASK);
+  clock.advance(6 * MIN);
+  await replier.flush();
+
+  await replier.onMessage({ id: 32, from: 'other', author: 'Тимур', replyTo: 901, text: 'это оно?', media: 'фото' });
+  assert.strictEqual(replier.pending(), 1);
+});

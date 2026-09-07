@@ -1,5 +1,6 @@
 const { isAddressed, mentionsAlias, decideAddressed, decideSpontaneous } = require('./reply-rules');
 const { botTurns, isFiller } = require('./thread');
+const { chatText } = require('./media');
 const { repeatsRecent } = require('./repetition');
 const { emojiCounts, emojiVotes, tally, verdictOf } = require('./reactions');
 const { localDayOf } = require('./schedule');
@@ -143,15 +144,17 @@ function createReplier({
       const posted = state.postedReplies ? state.postedReplies() : [];
       for (const item of posted) if (Number.isInteger(item.id)) own.add(item.id);
       for (const msg of messages) {
-        const text = (msg.text || '').trim();
+        const text = chatText(msg);
         if (!text) continue;
         remember({ ...msg, text });
-        if (String(msg.from) === String(meId)) state.noteSaid(text);
+        const caption = (msg.text || '').trim();
+        if (caption && String(msg.from) === String(meId)) state.noteSaid(caption);
       }
     },
 
     async onMessage(msg) {
-      const text = (msg.text || '').trim();
+      const caption = (msg.text || '').trim();
+      const text = chatText(msg);
       if (!text) return;
 
       remember({ ...msg, text });
@@ -172,6 +175,7 @@ function createReplier({
       }
 
       freshCount += 1;
+      if (!caption) return;
       if (!isAddressed(msg, { meId, aliases, messageById: byId })) return;
       if (state.wasAnswered(msg.id)) return;
       if (queue.some((item) => item.trigger.id === msg.id)) return;

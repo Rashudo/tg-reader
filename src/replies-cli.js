@@ -111,6 +111,7 @@ function memoryState() {
       author: nameFor(msg.from, names),
       replyTo: msg.replyTo,
       text: msg.text,
+      media: msg.media || null,
     });
     await replier.flush();
     if (clock >= nextTick) {

@@ -6,6 +6,7 @@ const { createClient } = require('./client');
 const { readSetup } = require('./preflight');
 const { prepare, summary, unknownGroups } = require('./matcher');
 const { peerKey, eventPeerKey } = require('./peer');
+const { describeMedia } = require('./media');
 const { chatReactionOf } = require('./reactions');
 const { createState } = require('./state');
 const { withTimeout } = require('./async');
@@ -188,6 +189,10 @@ async function startNewsDigest() {
 function chatMessageOf(event, names) {
   const msg = event.message;
   if (!msg) return null;
+  return normalizeChat(msg, names);
+}
+
+function normalizeChat(msg, names) {
   const from = msg.senderId ? String(msg.senderId) : null;
   return {
     id: msg.id,
@@ -195,6 +200,7 @@ function chatMessageOf(event, names) {
     author: (from && names.get(from)) || 'кто-то',
     replyTo: msg.replyTo ? msg.replyTo.replyToMsgId : null,
     text: msg.message || '',
+    media: describeMedia(msg) || null,
   };
 }
 
@@ -271,15 +277,7 @@ async function startReplies() {
 
   try {
     const history = await client.getMessages(chat, { limit: config.replies.context });
-    replier.seed(
-      [...history].reverse().map((msg) => ({
-        id: msg.id,
-        from: msg.senderId ? String(msg.senderId) : null,
-        author: (msg.senderId && names.get(String(msg.senderId))) || 'кто-то',
-        replyTo: msg.replyTo ? msg.replyTo.replyToMsgId : null,
-        text: msg.message || '',
-      }))
-    );
+    replier.seed([...history].reverse().map((msg) => normalizeChat(msg, names)));
     log(`Ответчик: подтянул ${replier.window().length} сообщений чата для контекста`);
   } catch (err) {
     log(`Ответчик: историю чата подтянуть не удалось (${err.message}) — начинаю с пустого окна`);
