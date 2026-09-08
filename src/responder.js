@@ -37,9 +37,20 @@ function ensureQuestion(text, question) {
   return `${core}?${tail}`;
 }
 
+function capitalize(text) {
+  const value = String(text || '');
+  const at = value.search(/[\p{L}\p{N}]/u);
+  if (at === -1) return value;
+  const letter = value[at];
+  if (!/\p{L}/u.test(letter)) return value;
+  const upper = letter.toUpperCase();
+  if (upper === letter) return value;
+  return value.slice(0, at) + upper + value.slice(at + 1);
+}
+
 function voiceBlock(samples) {
   if (samples.length === 0) return '';
-  return ['', 'Так ты пишешь на самом деле:', ...samples.map((sample) => `— ${sample}`), ''].join('\n');
+  return ['', 'Так ты пишешь на самом деле:', ...samples.map((sample) => `— ${capitalize(sample)}`), ''].join('\n');
 }
 
 function avoidBlock(avoid) {
@@ -119,7 +130,8 @@ function systemPrompt({
     avoidBlock(avoid),
     'Правила:',
     `— одна фраза, не длиннее ${maxChars} символов; длинная складная реплика выдаёт подделку вернее всего;`,
-    '— строчные буквы и твоя пунктуация, а не грамотная письменная речь;',
+    '— предложение начинай с большой буквы, имена и названия тоже с большой;',
+    '— в остальном пунктуация твоя, разговорная, а не грамотная письменная речь;',
     '— без вступлений, без «конечно», без извинений, без объяснения шутки;',
     '— говори просто: обычные слова, короткое предложение, чаще всего три-десять слов;',
     '— никаких придаточных, «то есть», «выходит, что» и переформулировок чужой мысли;',
@@ -193,7 +205,7 @@ function createResponder({
 
       if (!parsed || parsed.reply !== true) return SILENCE;
       const meme = pickMeme(memes, parsed.meme);
-      const text = ensureQuestion(clampText(String(parsed.text || ''), maxChars), parsed.question === true);
+      const text = capitalize(ensureQuestion(clampText(String(parsed.text || ''), maxChars), parsed.question === true));
       if (!text && !meme) return SILENCE;
 
       const known = new Set(window.map((msg) => msg.id));
@@ -208,4 +220,4 @@ function createResponder({
   };
 }
 
-module.exports = { createResponder, systemPrompt, clampText, ensureQuestion, gradedBlock, followUpBlock, SCHEMA };
+module.exports = { createResponder, systemPrompt, clampText, ensureQuestion, capitalize, gradedBlock, followUpBlock, SCHEMA };

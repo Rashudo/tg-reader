@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { createResponder, systemPrompt, clampText, ensureQuestion, SCHEMA } = require('./responder');
+const { createResponder, systemPrompt, clampText, ensureQuestion, capitalize, SCHEMA } = require('./responder');
 
 function answer(payload) {
   return { content: [{ type: 'text', text: JSON.stringify(payload) }], usage: {} };
@@ -21,7 +21,7 @@ test('в ответе на обращение replyToId — это тригге�
   const responder = createResponder({ createMessage: async () => answer({ reply: true, text: 'ага' }), samples: [] });
   const out = await responder.compose({ window: WINDOW, trigger: { id: 7, author: 'Тимур', text: 'ты идёшь?' }, mode: 'addressed' });
   assert.strictEqual(out.replyToId, 7);
-  assert.strictEqual(out.text, 'ага');
+  assert.strictEqual(out.text, 'Ага');
 });
 
 test('спонтанная реплика цепляется к сообщению, которое выбрала модель', async () => {
@@ -337,7 +337,7 @@ test('признак вопроса доходит до отправленног
     samples: [],
   });
   const out = await responder.compose({ window: WINDOW, trigger: { id: 7, author: 'Тимур', text: 'встречаемся' }, mode: 'addressed' });
-  assert.strictEqual(out.text, 'а во сколько?');
+  assert.strictEqual(out.text, 'А во сколько?');
 });
 
 test('правила требуют простой речи и знака вопроса', () => {
@@ -376,7 +376,7 @@ test('выдуманный id картинки отбрасывается', asyn
   });
   const out = await responder.compose({ window: WINDOW, trigger: null, mode: 'spontaneous', memes: CATALOGUE });
   assert.strictEqual(out.meme, null);
-  assert.strictEqual(out.text, 'ну да');
+  assert.strictEqual(out.text, 'Ну да');
 });
 
 test('картинка без текста молчанием не считается', async () => {
@@ -386,4 +386,46 @@ test('картинка без текста молчанием не считае�
   });
   const out = await responder.compose({ window: WINDOW, trigger: null, mode: 'spontaneous', memes: CATALOGUE });
   assert.strictEqual(out.reply, true);
+});
+
+test('реплика начинается с большой буквы', () => {
+  assert.strictEqual(capitalize('ну 300 так 300'), 'Ну 300 так 300');
+});
+
+test('уже большая буква остаётся как есть', () => {
+  assert.strictEqual(capitalize('Ну да'), 'Ну да');
+});
+
+test('кавычка и скобка в начале не мешают', () => {
+  assert.strictEqual(capitalize('«да ладно»'), '«Да ладно»');
+  assert.strictEqual(capitalize(')) ага'), ')) Ага');
+});
+
+test('цифра или эмодзи в начале большой буквы не требуют', () => {
+  assert.strictEqual(capitalize('300 закину'), '300 закину');
+  assert.strictEqual(capitalize('🔥 огонь'), '🔥 Огонь');
+});
+
+test('пустой текст остаётся пустым', () => {
+  assert.strictEqual(capitalize(''), '');
+});
+
+test('отправленный текст приходит с большой буквы', async () => {
+  const responder = createResponder({
+    createMessage: async () => answer({ reply: true, text: 'ок, значит 300 закину', question: false }),
+    samples: [],
+  });
+  const out = await responder.compose({ window: WINDOW, trigger: { id: 7, author: 'Тимур', text: 'скинь' }, mode: 'addressed' });
+  assert.strictEqual(out.text, 'Ок, значит 300 закину');
+});
+
+test('правила требуют больших букв в начале и в именах', () => {
+  const prompt = systemPrompt({ samples: [], maxChars: 160, mode: 'addressed' });
+  assert.match(prompt, /с большой буквы/);
+  assert.match(prompt, /имена/i);
+});
+
+test('образцы речи показываются с большой буквы, как и требуют правила', () => {
+  const prompt = systemPrompt({ samples: ['ну такое'], maxChars: 160, mode: 'addressed' });
+  assert.match(prompt, /— Ну такое/);
 });
