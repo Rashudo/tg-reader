@@ -32,7 +32,7 @@ test('компьютерная клавиатура за клавишные не
 });
 
 test('слова разложены по группам, которые можно снять целиком', () => {
-  assert.deepStrictEqual(groupNames(keywords), ['Телевизоры', 'Телефоны', 'Клавишные']);
+  assert.deepStrictEqual(groupNames(keywords), ['Телевизоры', 'Телефоны', 'Саундбары', 'Клавишные']);
 
   const безКлавишных = prepare(keywords, ['Клавишные']);
   assert.deepStrictEqual(findMatches('Продам синтезатор', безКлавишных), []);
@@ -82,4 +82,28 @@ test('слово «телефон» само по себе объявление�
 
 test('сербский гонорар за марку Honor не принимается', () => {
   assert.deepStrictEqual(hits('Trazim posao, honorar po dogovoru'), []);
+});
+
+test('саундбары ловятся во всех написаниях', () => {
+  const ads = [
+    'Продам soundbar Samsung, как новый',
+    'Sound bar LG SN4, 2.1',
+    'Sound-bar JBL, состояние отличное',
+    'Саундбар Xiaomi, торг',
+    'Саунд-бар с сабвуфером',
+    'Продаю звуковую панель для телевизора',
+    'Zvučni bar, kao nov',
+    'Prodajem zvucni bar sa subwooferom',
+  ];
+  for (const ad of ads) assert.notDeepStrictEqual(hits(ad), [], `не поймано: ${ad}`);
+});
+
+test('наушники soundcore за саундбар не считаются', () => {
+  assert.deepStrictEqual(hits('ANKER soundcore h30i состояние на фото, цена 1500 RSD'), []);
+  assert.deepStrictEqual(hits('Продам колонку JBL, звук отличный'), []);
+});
+
+test('группу саундбаров можно снять целиком', () => {
+  const безСаундбаров = prepare(keywords, ['Саундбары']);
+  assert.deepStrictEqual(findMatches('Продам саундбар', безСаундбаров), []);
 });

@@ -60,6 +60,15 @@ module.exports = [
     ],
   },
   {
+    group: 'Саундбары',
+    words: [
+      'soundbar', 'sound bar', 'sound-bar',
+      'саундбар', 'саунд бар', 'саунд-бар',
+      'звуковая панель', 'звуковую панель', 'звуковой панел',
+      'zvučni bar', 'zvucni bar', 'zvučna traka', 'zvucna traka',
+    ],
+  },
+  {
     group: 'Клавишные',
     words: [
       'пианино',
