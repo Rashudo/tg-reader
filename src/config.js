@@ -30,7 +30,8 @@ const config = {
   news: {
     channels: listFromEnv(process.env.NEWS_CHANNELS),
     target: (process.env.NEWS_TARGET || process.env.TARGET || 'me').trim(),
-    model: (process.env.NEWS_MODEL || 'claude-haiku-4-5').trim(),
+    model: (process.env.NEWS_MODEL || 'claude-fable-5-1').trim(),
+    effort: (process.env.NEWS_EFFORT || 'low').trim(),
     hour: numFromEnv(process.env.NEWS_HOUR, 7),
     timeZone: (process.env.NEWS_TZ || 'Europe/Belgrade').trim(),
     maxMessages: numFromEnv(process.env.NEWS_MAX_MESSAGES, 400),
@@ -40,7 +41,8 @@ const config = {
   replies: {
     chat: (process.env.REPLY_CHAT || '').trim(),
     enabled: (process.env.REPLY_ENABLED || 'on').trim().toLowerCase() !== 'off',
-    model: (process.env.REPLY_MODEL || 'claude-opus-4-8').trim(),
+    model: (process.env.REPLY_MODEL || 'claude-fable-5-1').trim(),
+    effort: (process.env.REPLY_EFFORT || 'low').trim(),
     aliases: listFromEnv(process.env.REPLY_ALIASES),
     dailyBudget: numFromEnv(process.env.REPLY_DAILY_BUDGET, 4),
     addressedBudget: numFromEnv(process.env.REPLY_ADDRESSED_BUDGET, 10),

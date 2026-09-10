@@ -174,6 +174,7 @@ function createResponder({
   samples = [],
   maxChars = DEFAULT_MAX_CHARS,
   name = 'Стас',
+  effort = '',
   log = console.log,
 }) {
   return {
@@ -183,8 +184,17 @@ function createResponder({
         max_tokens: MAX_TOKENS,
         system: systemPrompt({ samples, maxChars, mode, name, avoid, graded, followUp, memes }),
         messages: [{ role: 'user', content: buildUserMessage({ window, trigger }) }],
-        output_config: { format: { type: 'json_schema', schema: SCHEMA } },
+        output_config: {
+          format: { type: 'json_schema', schema: SCHEMA },
+          ...(effort ? { effort } : {}),
+        },
       });
+
+      if (response.stop_reason === 'refusal') {
+        const why = (response.stop_details && response.stop_details.category) || 'без причины';
+        log(`Ответчик: модель ответила отказом (${why}) — молчу`);
+        return SILENCE;
+      }
 
       const usage = response.usage || {};
       if (usage.input_tokens) {

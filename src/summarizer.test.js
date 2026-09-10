@@ -28,12 +28,36 @@ test('в запрос уходит заданная модель и лимит �
   assert.ok(t.calls[0].max_tokens >= 4000);
 });
 
-test('ни thinking, ни effort не отправляются — Haiku их не принимает', async () => {
+test('без настройки усилия ни thinking, ни effort не отправляются', async () => {
   const t = replyWith(GOOD);
   const summarizer = createSummarizer({ model: 'claude-haiku-4-5', createMessage: t.createMessage, log: () => {} });
   await summarizer.summarize(ITEMS);
   assert.strictEqual(t.calls[0].thinking, undefined);
-  assert.strictEqual(t.calls[0].output_config && t.calls[0].output_config.effort, undefined);
+  assert.strictEqual(t.calls[0].output_config.effort, undefined);
+});
+
+test('заданное усилие уходит в запрос рядом со схемой', async () => {
+  const t = replyWith(GOOD);
+  const summarizer = createSummarizer({ model: 'claude-fable-5-1', effort: 'low', createMessage: t.createMessage, log: () => {} });
+  await summarizer.summarize(ITEMS);
+  assert.strictEqual(t.calls[0].output_config.effort, 'low');
+  assert.ok(t.calls[0].output_config.format);
+  assert.strictEqual(t.calls[0].thinking, undefined);
+});
+
+test('отказ модели виден как отказ, а не как пустая сводка', async () => {
+  const calls = [];
+  const createMessage = async (request) => {
+    calls.push(request);
+    return { content: [], usage: {}, stop_reason: 'refusal', stop_details: { category: 'cyber' } };
+  };
+  const summarizer = createSummarizer({ createMessage, log: () => {}, attempts: 1 });
+  await assert.rejects(() => summarizer.summarize(ITEMS), /отказ/i);
+});
+
+test('цена Fable считается по своему тарифу', () => {
+  assert.strictEqual(estimateCost('claude-fable-5-1', 1e6, 0), 10);
+  assert.strictEqual(estimateCost('claude-fable-5-1', 0, 1e6), 50);
 });
 
 test('тексты сообщений и ссылки попадают в промпт', async () => {

@@ -6,6 +6,8 @@ const PRICES = {
   'claude-sonnet-5': { input: 2, output: 10 },
   'claude-opus-5': { input: 5, output: 25 },
   'claude-opus-4-8': { input: 5, output: 25 },
+  'claude-fable-5': { input: 10, output: 50 },
+  'claude-fable-5-1': { input: 10, output: 50 },
 };
 
 const SCHEMA = {
@@ -131,6 +133,7 @@ function textOf(response) {
 
 function createSummarizer({
   model = DEFAULT_MODEL,
+  effort = '',
   createMessage,
   log = console.log,
   maxItems = DEFAULT_MAX_ITEMS,
@@ -146,13 +149,21 @@ function createSummarizer({
         max_tokens: MAX_TOKENS,
         system: systemPrompt(maxItems),
         messages: [{ role: 'user', content: buildUserMessage(items) }],
-        output_config: { format: { type: 'json_schema', schema: SCHEMA } },
+        output_config: {
+          format: { type: 'json_schema', schema: SCHEMA },
+          ...(effort ? { effort } : {}),
+        },
       };
       const response = await withRetries(() => createMessage(request), {
         attempts,
         pauseMs: retryPauseMs,
         log,
       });
+
+      if (response.stop_reason === 'refusal') {
+        const why = (response.stop_details && response.stop_details.category) || 'без причины';
+        throw new Error(`модель ответила отказом (${why})`);
+      }
 
       const usage = response.usage || {};
       const cost = estimateCost(model, usage.input_tokens || 0, usage.output_tokens || 0);

@@ -429,3 +429,44 @@ test('образцы речи показываются с большой бук�
   const prompt = systemPrompt({ samples: ['ну такое'], maxChars: 160, mode: 'addressed' });
   assert.match(prompt, /— Ну такое/);
 });
+
+test('усилие уходит в запрос рядом со схемой', async () => {
+  const seen = [];
+  const responder = createResponder({
+    createMessage: async (req) => {
+      seen.push(req);
+      return answer({ reply: false, text: '', question: false });
+    },
+    samples: [],
+    effort: 'low',
+  });
+  await responder.compose({ window: WINDOW, trigger: null, mode: 'spontaneous' });
+  assert.strictEqual(seen[0].output_config.effort, 'low');
+  assert.ok(seen[0].output_config.format);
+  assert.strictEqual(seen[0].thinking, undefined);
+});
+
+test('без настройки усилия параметр не шлётся', async () => {
+  const seen = [];
+  const responder = createResponder({
+    createMessage: async (req) => {
+      seen.push(req);
+      return answer({ reply: false, text: '', question: false });
+    },
+    samples: [],
+  });
+  await responder.compose({ window: WINDOW, trigger: null, mode: 'spontaneous' });
+  assert.strictEqual(seen[0].output_config.effort, undefined);
+});
+
+test('отказ модели — молчание, а не поломка', async () => {
+  const logged = [];
+  const responder = createResponder({
+    createMessage: async () => ({ content: [], usage: {}, stop_reason: 'refusal', stop_details: { category: 'cyber' } }),
+    samples: [],
+    log: (line) => logged.push(line),
+  });
+  const out = await responder.compose({ window: WINDOW, trigger: null, mode: 'spontaneous' });
+  assert.strictEqual(out.reply, false);
+  assert.ok(logged.some((line) => /отказ/i.test(line)));
+});

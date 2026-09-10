@@ -265,6 +265,7 @@ async function startReplies() {
     memes,
     responder: createResponder({
       model: config.replies.model,
+      effort: config.replies.effort,
       createMessage: news.createAnthropicCall(config.anthropicKey),
       samples: voice.samples,
       maxChars: config.replies.maxChars,

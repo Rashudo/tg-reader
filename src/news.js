@@ -37,6 +37,7 @@ async function resolveNewsSources(client, log) {
 function createNewsDigest({ client, sources, target, notify, log, createMessage }) {
   const summarizer = createSummarizer({
     model: config.news.model,
+    effort: config.news.effort,
     createMessage: createMessage || createAnthropicCall(config.anthropicKey),
     maxItems: config.news.maxItems,
     log,

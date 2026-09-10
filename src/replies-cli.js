@@ -72,6 +72,7 @@ function memoryState() {
     state,
     responder: createResponder({
       model: config.replies.model,
+      effort: config.replies.effort,
       createMessage: createAnthropicCall(config.anthropicKey),
       samples: voice.samples,
       maxChars: config.replies.maxChars,

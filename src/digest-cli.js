@@ -31,6 +31,7 @@ async function fromFile(file) {
   console.error('Файловый режим делает один платный вызов модели, Telegram не трогает.');
   const summarizer = createSummarizer({
     model: config.news.model,
+    effort: config.news.effort,
     createMessage: news.createAnthropicCall(config.anthropicKey),
     maxItems: config.news.maxItems,
     log,
