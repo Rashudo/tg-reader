@@ -57,6 +57,7 @@ function rig(over = {}) {
     chat: 'чат',
     state: over.state || fakeState(),
     memes: over.memes === undefined ? null : over.memes,
+    typing: over.typing === undefined ? null : over.typing,
     responder: over.responder || { compose: async () => ({ reply: true, text: 'ага', replyToId: 11 }) },
     notifier: {
       send: async (text, options) => {
@@ -772,7 +773,7 @@ function memeRig(over = {}) {
     },
   };
   const state = over.state;
-  return { ...rig({ responder, memes, ...(state ? { state } : {}) }), shots, offered, memes };
+  return { ...rig({ responder, memes, ...(state ? { state } : {}), ...(over.typing ? { typing: over.typing } : {}) }), shots, offered, memes };
 }
 
 test('каталог картинок предлагается модели', async () => {
@@ -831,4 +832,92 @@ test('свежеотправленная картинка второй раз н
   clock.advance(6 * MIN);
   await replier.flush();
   assert.deepStrictEqual(offered[1], []);
+});
+
+function typingSpy(steps) {
+  return {
+    show: async (kind = 'text') => steps.push(`show:${kind}`),
+    stop: () => steps.push('stop'),
+    hide: async () => steps.push('hide'),
+  };
+}
+
+test('статус печати виден до вызова модели и снимается отправкой', async () => {
+  const steps = [];
+  const responder = {
+    compose: async ({ trigger }) => {
+      steps.push('compose');
+      return { reply: true, text: 'Ага', meme: null, replyToId: trigger ? trigger.id : null };
+    },
+  };
+  const { replier, sent, clock } = rig({ responder, typing: typingSpy(steps) });
+  await replier.onMessage(MINE);
+  await replier.onMessage(ASK);
+  clock.advance(6 * MIN);
+  await replier.flush();
+
+  assert.deepStrictEqual(steps, ['show:text', 'compose', 'stop']);
+  assert.strictEqual(sent.length, 1);
+});
+
+test('решение промолчать статус убирает', async () => {
+  const steps = [];
+  const responder = { compose: async () => ({ reply: false, text: '', meme: null, replyToId: null }) };
+  const { replier, sent, clock } = rig({ responder, typing: typingSpy(steps) });
+  await replier.onMessage(MINE);
+  await replier.onMessage(ASK);
+  clock.advance(6 * MIN);
+  await replier.flush();
+
+  assert.deepStrictEqual(steps, ['show:text', 'hide']);
+  assert.strictEqual(sent.length, 0);
+});
+
+test('повтор недавней шутки тоже снимает статус', async () => {
+  const steps = [];
+  const state = fakeState();
+  state.noteSaid('Покроем как-нибудь, деньги найдутся');
+  const responder = {
+    compose: async ({ trigger }) => ({ reply: true, text: 'Деньги найдутся, покроем', meme: null, replyToId: trigger ? trigger.id : null }),
+  };
+  const { replier, sent, clock } = rig({ responder, state, typing: typingSpy(steps) });
+  await replier.onMessage(MINE);
+  await replier.onMessage(ASK);
+  clock.advance(6 * MIN);
+  await replier.flush();
+
+  assert.deepStrictEqual(steps, ['show:text', 'hide']);
+  assert.strictEqual(sent.length, 0);
+});
+
+test('перед картинкой статус меняется на выбор стикера', async () => {
+  const steps = [];
+  const { replier, clock } = memeRig({ typing: typingSpy(steps) });
+  await replier.onMessage(MINE);
+  await replier.onMessage(ASK);
+  clock.advance(6 * MIN);
+  await replier.flush();
+
+  assert.deepStrictEqual(steps, ['show:text', 'show:sticker', 'stop']);
+});
+
+test('упавшая отправка статус за собой убирает', async () => {
+  const steps = [];
+  const { replier, clock, logs } = rig({
+    typing: typingSpy(steps),
+    extra: {
+      client: {
+        sendMessage: async () => {
+          throw new Error('связь потеряна');
+        },
+      },
+    },
+  });
+  await replier.onMessage(MINE);
+  await replier.onMessage(ASK);
+  clock.advance(6 * MIN);
+  await replier.flush();
+
+  assert.deepStrictEqual(steps, ['show:text', 'hide']);
+  assert.ok(logs.some((line) => /связь потеряна/.test(line)));
 });

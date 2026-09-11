@@ -18,6 +18,7 @@ function createReplier({
   responder,
   notifier,
   memes = null,
+  typing = null,
   meId,
   aliases = [],
   limits,
@@ -83,8 +84,18 @@ function createReplier({
     return sampleMemes(ready, limits.memeChoices, random);
   }
 
-  async function speak({ mode, trigger, followUp = false }) {
+  async function speak(options) {
+    try {
+      return await compose(options);
+    } catch (err) {
+      if (typing) await typing.hide();
+      throw err;
+    }
+  }
+
+  async function compose({ mode, trigger, followUp = false }) {
     const said = state.recentReplies();
+    if (typing) await typing.show('text');
     const composed = await responder.compose({
       memes: memesOnOffer(),
       avoid: said,
@@ -100,6 +111,7 @@ function createReplier({
       followUp,
     });
     if (!composed.reply) {
+      if (typing) await typing.hide();
       log(`Ответчик: модель решила промолчать (${mode})`);
       return false;
     }
@@ -107,9 +119,12 @@ function createReplier({
     const meme = composed.meme || null;
 
     if (!meme && repeatsRecent(composed.text, said.slice(-echoGuard))) {
+      if (typing) await typing.hide();
       log(`Ответчик: повтор недавней шутки — молчу («${composed.text}»)`);
       return false;
     }
+
+    if (typing && meme) await typing.show('sticker');
 
     const posted = meme
       ? await memes.send({ id: meme.id, replyTo: composed.replyToId || null })
@@ -118,6 +133,8 @@ function createReplier({
           ...(composed.replyToId ? { replyTo: composed.replyToId } : {}),
           parseMode: false,
         });
+
+    if (typing) typing.stop();
 
     const shown = meme ? `[${titleOf(meme)}]` : composed.text;
     if (!meme) state.noteSaid(composed.text);

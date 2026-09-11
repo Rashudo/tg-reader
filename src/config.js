@@ -43,6 +43,7 @@ const config = {
     enabled: (process.env.REPLY_ENABLED || 'on').trim().toLowerCase() !== 'off',
     model: (process.env.REPLY_MODEL || 'claude-fable-5-1').trim(),
     effort: (process.env.REPLY_EFFORT || 'low').trim(),
+    typing: (process.env.REPLY_TYPING || 'on').trim().toLowerCase() !== 'off',
     aliases: listFromEnv(process.env.REPLY_ALIASES),
     dailyBudget: numFromEnv(process.env.REPLY_DAILY_BUDGET, 4),
     addressedBudget: numFromEnv(process.env.REPLY_ADDRESSED_BUDGET, 10),

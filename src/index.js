@@ -9,6 +9,7 @@ const { peerKey, eventPeerKey } = require('./peer');
 const { describeMedia } = require('./media');
 const { loadMemes } = require('./memes');
 const { createMemeSender } = require('./meme-sender');
+const { createTyping } = require('./typing');
 const { chatReactionOf } = require('./reactions');
 const { createState } = require('./state');
 const { withTimeout } = require('./async');
@@ -263,6 +264,7 @@ async function startReplies() {
     chat,
     state,
     memes,
+    typing: config.replies.typing ? createTyping({ client, chat, log }) : null,
     responder: createResponder({
       model: config.replies.model,
       effort: config.replies.effort,
