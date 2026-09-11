@@ -69,6 +69,14 @@ module.exports = [
     ],
   },
   {
+    group: 'Колонки',
+    words: [
+      'колонк', 'колонок', 'kolonk',
+      'zvučnik', 'zvucnik', 'zvučnic', 'zvucnic',
+      'сабвуфер', 'subwoofer', 'аудиосистем', 'бумбокс', 'boombox',
+    ],
+  },
+  {
     group: 'Клавишные',
     words: [
       'пианино',

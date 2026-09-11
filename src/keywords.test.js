@@ -32,7 +32,7 @@ test('компьютерная клавиатура за клавишные не
 });
 
 test('слова разложены по группам, которые можно снять целиком', () => {
-  assert.deepStrictEqual(groupNames(keywords), ['Телевизоры', 'Телефоны', 'Саундбары', 'Клавишные']);
+  assert.deepStrictEqual(groupNames(keywords), ['Телевизоры', 'Телефоны', 'Саундбары', 'Колонки', 'Клавишные']);
 
   const безКлавишных = prepare(keywords, ['Клавишные']);
   assert.deepStrictEqual(findMatches('Продам синтезатор', безКлавишных), []);
@@ -100,10 +100,36 @@ test('саундбары ловятся во всех написаниях', () 
 
 test('наушники soundcore за саундбар не считаются', () => {
   assert.deepStrictEqual(hits('ANKER soundcore h30i состояние на фото, цена 1500 RSD'), []);
-  assert.deepStrictEqual(hits('Продам колонку JBL, звук отличный'), []);
+  const безКолонок = prepare(keywords, ['Колонки']);
+  assert.deepStrictEqual(findMatches('Продам колонку JBL, звук отличный', безКолонок), []);
 });
 
 test('группу саундбаров можно снять целиком', () => {
   const безСаундбаров = prepare(keywords, ['Саундбары']);
   assert.deepStrictEqual(findMatches('Продам саундбар', безСаундбаров), []);
+});
+
+test('объявления о колонках ловятся', () => {
+  const ads = [
+    'Колонка бт, type c. Большая, тяжёлая. 2000 рсд',
+    'Продам блютуз-колонку IKEA ENEBY 20 (Gen 2)',
+    'JBL Bluetooth-колонка портативная, рабочая 2 500 RSD',
+    'Продаю пару колонок Sven, б/у',
+    'Prodajem zvučnike, kao novi',
+    'Zvucnik bluetooth, malo koriscen',
+    'Сабвуфер активный, 100 Вт',
+    'Prodajem kolonku, bluetooth',
+  ];
+  for (const ad of ads) assert.notDeepStrictEqual(hits(ad), [], `не поймано: ${ad}`);
+});
+
+test('наушники и встроенные динамики за колонки не считаются', () => {
+  assert.deepStrictEqual(hits('Продаю наушники JBL tune 500, проводные, 1000 RSD'), []);
+  assert.deepStrictEqual(hits('Монитор Philips, 100 Hz, со встроенным звуком (динамиками)'), []);
+  assert.deepStrictEqual(hits('Продаю Logitech G435 — беспроводные игровые наушники'), []);
+});
+
+test('группу колонок можно снять целиком', () => {
+  const безКолонок = prepare(keywords, ['Колонки']);
+  assert.deepStrictEqual(findMatches('Продам блютуз-колонку', безКолонок), []);
 });
