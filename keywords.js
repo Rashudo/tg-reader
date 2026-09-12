@@ -77,6 +77,17 @@ module.exports = [
     ],
   },
   {
+    group: 'Часы',
+    words: [
+      { word: 'часы' },
+      'умные час', 'смарт час', 'смарт-час', 'смартчас', 'вотч',
+      'smartwatch', 'smart watch', 'apple watch', 'galaxy watch', 'huawei watch', 'honor watch',
+      'amazfit', 'garmin', 'fitbit', 'mi band', 'miband',
+      'фитнес-браслет', 'фитнес браслет', 'фитнесс браслет', 'фитнес-трекер', 'фитнес трекер', 'шагомер',
+      'pametni sat', 'pametan sat', 'fitnes narukvic', 'fitness narukvic',
+    ],
+  },
+  {
     group: 'Клавишные',
     words: [
       'пианино',

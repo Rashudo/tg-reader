@@ -32,7 +32,7 @@ test('компьютерная клавиатура за клавишные не
 });
 
 test('слова разложены по группам, которые можно снять целиком', () => {
-  assert.deepStrictEqual(groupNames(keywords), ['Телевизоры', 'Телефоны', 'Саундбары', 'Колонки', 'Клавишные']);
+  assert.deepStrictEqual(groupNames(keywords), ['Телевизоры', 'Телефоны', 'Саундбары', 'Колонки', 'Часы', 'Клавишные']);
 
   const безКлавишных = prepare(keywords, ['Клавишные']);
   assert.deepStrictEqual(findMatches('Продам синтезатор', безКлавишных), []);
@@ -132,4 +132,38 @@ test('наушники и встроенные динамики за колон�
 test('группу колонок можно снять целиком', () => {
   const безКолонок = prepare(keywords, ['Колонки']);
   assert.deepStrictEqual(findMatches('Продам блютуз-колонку', безКолонок), []);
+});
+
+test('умные часы и браслеты ловятся', () => {
+  const ads = [
+    'Часы Huawei GT4, в отличном состоянии, зарядка, 3 ремешка. 60 eur',
+    'Продам детские GPS часы Aimoto Start розовые',
+    'Умные часы Amazfit GTS 4, коробка есть',
+    'Смарт-часы женские, розовые',
+    'Apple Watch SE 44mm, торг',
+    'Продам фитнес-браслет Xiaomi Mi Band 8',
+    'Фитнес браслет, шагомер, пульс',
+    'Garmin Forerunner 245, б/у',
+    'Prodajem pametni sat, kao nov',
+    'Fitnes narukvica, malo koriscena',
+    'Эпл вотч 9, 41 мм',
+  ];
+  for (const ad of ads) assert.notDeepStrictEqual(hits(ad), [], `не поймано: ${ad}`);
+});
+
+test('часы вне именительного падежа не ловятся', () => {
+  assert.deepStrictEqual(hits('Наиграно примерно 50–100 часов максимум'), []);
+  assert.deepStrictEqual(hits('Ремешок для часов, кожаный, новый'), []);
+  assert.deepStrictEqual(hits('Заберу в течение часа'), []);
+  assert.deepStrictEqual(hits('Часть комплекта потеряна'), []);
+});
+
+test('«часы отдыха» и «песочные часы» — известная плата за ключ «часы»', () => {
+  assert.deepStrictEqual(hits('Любит быть рядом с человеком в часы отдыха'), ['часы']);
+  assert.deepStrictEqual(hits('Комплектация: карточки, фишки, песочные часы'), ['часы']);
+});
+
+test('группу часов можно снять целиком', () => {
+  const безЧасов = prepare(keywords, ['Часы']);
+  assert.deepStrictEqual(findMatches('Умные часы Amazfit', безЧасов), []);
 });
