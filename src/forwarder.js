@@ -58,6 +58,11 @@ function createForwarder({
       (msg) => !state.wasSent(chatKey, msg.id) && !inFlight.has(`${chatKey}:${msg.id}`)
     );
     if (fresh.length === 0) return;
+    if (fresh.length < messages.length && messages.some((msg) => state.wasSent(chatKey, msg.id))) {
+      fresh.forEach((msg) => state.markSent(chatKey, msg.id));
+      if (advance) state.advance(chatKey, newestId);
+      return;
+    }
 
     const ids = fresh.map((msg) => msg.id).sort((a, b) => a - b);
     const keys = ids.map((id) => `${chatKey}:${id}`);

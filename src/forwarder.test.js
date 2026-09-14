@@ -239,3 +239,17 @@ test('у источника может быть свой набор ключей
   await h.forwarder.onMessage({ message: msg(11, 'продам электросамокат') });
   assert.deepStrictEqual(h.sent, [{ kind: 'forward', ids: [11] }]);
 });
+
+test('альбом, часть которого уже переслана, второй раз не уходит', async () => {
+  const history = channelHistory([
+    msg(101, 'продам телевизор', { groupedId: 7 }),
+    msg(102, '', { groupedId: 7 }),
+  ]);
+  const h = harness({ history });
+  h.store.lastId = 100;
+  h.store.sentIds.push(101);
+  await h.forwarder.backfill(SOURCE);
+  assert.deepStrictEqual(h.sent, []);
+  assert.ok(h.store.sentIds.includes(102));
+  assert.strictEqual(h.store.lastId, 102);
+});
