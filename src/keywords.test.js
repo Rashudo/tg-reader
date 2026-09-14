@@ -32,7 +32,7 @@ test('компьютерная клавиатура за клавишные не
 });
 
 test('слова разложены по группам, которые можно снять целиком', () => {
-  assert.deepStrictEqual(groupNames(keywords), ['Телевизоры', 'Телефоны', 'Саундбары', 'Колонки', 'Часы', 'Клавишные']);
+  assert.deepStrictEqual(groupNames(keywords), ['Телевизоры', 'Телефоны', 'Саундбары', 'Колонки', 'Часы', 'Электросамокаты', 'Клавишные']);
 
   const безКлавишных = prepare(keywords, ['Клавишные']);
   assert.deepStrictEqual(findMatches('Продам синтезатор', безКлавишных), []);
@@ -166,4 +166,30 @@ test('«часы отдыха» и «песочные часы» — извес�
 test('группу часов можно снять целиком', () => {
   const безЧасов = prepare(keywords, ['Часы']);
   assert.deepStrictEqual(findMatches('Умные часы Amazfit', безЧасов), []);
+});
+
+test('электросамокаты ловятся во всех написаниях и по маркам', () => {
+  const ads = [
+    'Электро самокат, складной. Bluewheel IX250. 120 Евро',
+    'Продам электросамокат, пробег 300 км',
+    'Электро-самокат детский, до 50 кг',
+    'Электрический самокат, батарея новая',
+    'Segway Ninebot Max G30, отличное состояние',
+    'Kugoo S3 Pro, торг',
+    'Prodajem električni trotinet, domet 25 km',
+    'Elektricni trotinet Xiaomi, malo koriscen',
+    'E-scooter, 350W, charger included',
+  ];
+  for (const ad of ads) assert.notDeepStrictEqual(hits(ad), [], `не поймано: ${ad}`);
+});
+
+test('обычные и детские самокаты за электросамокат не считаются', () => {
+  assert.deepStrictEqual(hits('DECATHLON самокат Oxelo Mid 9, темно-серый/черный, макс. нагрузка 100 кг'), []);
+  assert.deepStrictEqual(hits('Трёхколёсный самокат Kreiss для детей ростом 85–125 см'), []);
+  assert.deepStrictEqual(hits('Prodajem dečiji trotinet, roze'), []);
+});
+
+test('группу электросамокатов можно снять целиком', () => {
+  const безСамокатов = prepare(keywords, ['Электросамокаты']);
+  assert.deepStrictEqual(findMatches('Продам электросамокат', безСамокатов), []);
 });

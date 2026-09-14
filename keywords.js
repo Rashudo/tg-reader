@@ -88,6 +88,16 @@ module.exports = [
     ],
   },
   {
+    group: 'Электросамокаты',
+    words: [
+      'электросамокат', 'электро самокат', 'электро-самокат',
+      'электрический самокат', 'электрического самоката', 'электрическом самокате',
+      'e-scooter', 'escooter', 'e scooter', 'electric scooter',
+      'ninebot', 'segway', 'kugoo', 'dualtron', 'kaabo', 'inokim', 'bluewheel',
+      'električni trotinet', 'elektricni trotinet', 'e-trotinet', 'etrotinet',
+    ],
+  },
+  {
     group: 'Клавишные',
     words: [
       'пианино',
