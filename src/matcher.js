@@ -102,6 +102,7 @@ module.exports = {
   findHits,
   describeHits,
   groupNames,
+  sameName,
   unknownGroups,
   summary,
 };

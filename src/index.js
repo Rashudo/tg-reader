@@ -7,6 +7,7 @@ const { readSetup } = require('./preflight');
 const { prepare, summary, unknownGroups } = require('./matcher');
 const { peerKey, eventPeerKey } = require('./peer');
 const { describeMedia } = require('./media');
+const { keywordsForRef, normalizeRef, unknownOnlyGroups, strayOnlyRefs } = require('./channel-only');
 const { loadMemes } = require('./memes');
 const { createMemeSender } = require('./meme-sender');
 const { createTyping } = require('./typing');
@@ -79,11 +80,20 @@ function shutdown(code) {
 }
 
 async function startForwarding() {
+  const keywordsBySource = new Map();
   for (const ref of config.channels) {
     try {
       const entity = await client.getEntity(ref);
       sources.set(peerKey(entity), entity);
-      log(`Источник: ${entity.title || entity.username || ref} (id ${entity.id})`);
+      const onlyRef = [ref, entity.username].find((name) => name && config.channelOnly.has(normalizeRef(name)));
+      if (onlyRef) {
+        keywordsBySource.set(
+          peerKey(entity),
+          keywordsForRef(onlyRef, { keywords, disabled: config.disabledGroups, only: config.channelOnly })
+        );
+      }
+      const limit = onlyRef ? `, только: ${config.channelOnly.get(normalizeRef(onlyRef)).join(', ')}` : '';
+      log(`Источник: ${entity.title || entity.username || ref} (id ${entity.id})${limit}`);
     } catch (err) {
       console.error(`Не удалось открыть канал "${ref}": ${err.message}. Вы точно на него подписаны?`);
       process.exit(1);
@@ -106,6 +116,7 @@ async function startForwarding() {
     sources,
     target,
     keywords: KEYWORDS,
+    keywordsFor: (source) => keywordsBySource.get(peerKey(source)) || KEYWORDS,
     notifier,
     log,
     peerKeyOf: peerKey,
@@ -353,6 +364,12 @@ async function main() {
 
   for (const name of unknownGroups(config.disabledGroups, keywords)) {
     console.error(`В DISABLED_GROUPS указана неизвестная группа «${name}» — проверьте написание в keywords.js`);
+  }
+  for (const name of unknownOnlyGroups(config.channelOnly, keywords)) {
+    console.error(`В CHANNEL_ONLY указана неизвестная группа «${name}» — проверьте написание в keywords.js`);
+  }
+  for (const ref of strayOnlyRefs(config.channelOnly, config.channels)) {
+    console.error(`В CHANNEL_ONLY указан канал «${ref}», которого нет в CHANNEL — ограничение ни на что не действует`);
   }
 
   client = createClient();

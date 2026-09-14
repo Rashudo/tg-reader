@@ -10,6 +10,7 @@ function createForwarder({
   sources,
   target,
   keywords,
+  keywordsFor = () => keywords,
   notifier,
   log,
   peerKeyOf,
@@ -33,7 +34,7 @@ function createForwarder({
 
     state.noteSeen(chatKey, freshToUs, now());
 
-    const hits = findHits(text, keywords);
+    const hits = findHits(text, keywordsFor(source));
     if (hits.length === 0) {
       state.advance(chatKey, newestId);
       return;

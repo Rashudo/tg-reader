@@ -93,7 +93,7 @@ module.exports = [
       'электросамокат', 'электро самокат', 'электро-самокат',
       'электрический самокат', 'электрического самоката', 'электрическом самокате',
       'e-scooter', 'escooter', 'e scooter', 'electric scooter',
-      'ninebot', 'segway', 'kugoo', 'dualtron', 'kaabo', 'inokim', 'bluewheel',
+      'ninebot', 'segway', 'kugoo', 'dualtron', 'kaabo', 'inokim', 'bluewheel', 'm365', 'mi scooter',
       'električni trotinet', 'elektricni trotinet', 'e-trotinet', 'etrotinet',
     ],
   },

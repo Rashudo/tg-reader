@@ -11,7 +11,7 @@ function msg(id, text, extra = {}) {
   return { id, message: text, ...extra };
 }
 
-function harness({ forwardFails = false, sendFails = false } = {}) {
+function harness({ forwardFails = false, sendFails = false, keywordsFor } = {}) {
   const sent = [];
   const alerts = [];
   const logs = [];
@@ -38,6 +38,7 @@ function harness({ forwardFails = false, sendFails = false } = {}) {
     sources: new Map([[KEY, SOURCE]]),
     target: 'получатель',
     keywords: KEYWORDS,
+    ...(keywordsFor ? { keywordsFor } : {}),
     notifier: { send: async (t) => alerts.push(t) },
     log: (m) => logs.push(m),
     peerKeyOf: () => KEY,
@@ -143,4 +144,15 @@ test('пустой канал отставанием не считается', a
 
 test('до первой позиции любое сообщение считается непрочитанным', async () => {
   assert.strictEqual(await probeHarness(1, null).isBehind(SOURCE), true);
+});
+
+test('у источника может быть свой набор ключей', async () => {
+  const scooters = prepare([{ group: 'Электросамокаты', words: ['электросамокат'] }]);
+  const h = harness({ keywordsFor: () => scooters });
+  await h.forwarder.onMessage({ message: msg(10, 'продам телевизор') });
+  assert.deepStrictEqual(h.sent, []);
+  assert.strictEqual(h.store.lastId, 10);
+
+  await h.forwarder.onMessage({ message: msg(11, 'продам электросамокат') });
+  assert.deepStrictEqual(h.sent, [{ kind: 'forward', ids: [11] }]);
 });

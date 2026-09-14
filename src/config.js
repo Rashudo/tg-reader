@@ -2,6 +2,7 @@ const path = require('path');
 
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const { numFromEnv, hourOrOff, pauseMsFrom, listFromEnv, listOr } = require('./env');
+const { parseChannelOnly } = require('./channel-only');
 
 function required(name) {
   const value = (process.env[name] || '').trim();
@@ -22,6 +23,7 @@ const config = {
     .filter(Boolean),
   target: (process.env.TARGET || 'me').trim(),
   disabledGroups: listFromEnv(process.env.DISABLED_GROUPS),
+  channelOnly: parseChannelOnly(process.env.CHANNEL_ONLY),
   alert: {
     token: (process.env.ALERT_BOT_TOKEN || '').trim(),
     chatId: (process.env.ALERT_CHAT_ID || '').trim(),

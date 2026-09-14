@@ -179,6 +179,7 @@ test('электросамокаты ловятся во всех написан
     'Prodajem električni trotinet, domet 25 km',
     'Elektricni trotinet Xiaomi, malo koriscen',
     'E-scooter, 350W, charger included',
+    'Xiaomi M365  Самокат в отличном состоянии, полностью исправен',
   ];
   for (const ad of ads) assert.notDeepStrictEqual(hits(ad), [], `не поймано: ${ad}`);
 });
