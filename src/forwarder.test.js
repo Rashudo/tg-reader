@@ -11,7 +11,22 @@ function msg(id, text, extra = {}) {
   return { id, message: text, ...extra };
 }
 
-function harness({ forwardFails = false, sendFails = false, keywordsFor } = {}) {
+function channelHistory(messages, { fails = false } = {}) {
+  const calls = [];
+  return {
+    calls,
+    getMessages: async (source, { limit = 100, minId = 0, offsetId = 0 } = {}) => {
+      calls.push({ limit, minId, offsetId });
+      if (fails) throw new Error('канал не ответил');
+      return messages
+        .filter((m) => m.id > minId && (!offsetId || m.id < offsetId))
+        .sort((a, b) => b.id - a.id)
+        .slice(0, limit);
+    },
+  };
+}
+
+function harness({ forwardFails = false, sendFails = false, keywordsFor, history, extra = {} } = {}) {
   const sent = [];
   const alerts = [];
   const logs = [];
@@ -26,7 +41,7 @@ function harness({ forwardFails = false, sendFails = false, keywordsFor } = {}) 
         if (sendFails) throw new Error('сеть');
         sent.push({ kind: 'copy', text: params.message, parseMode: params.parseMode });
       },
-      getMessages: async () => harness.fetched || [],
+      getMessages: history ? history.getMessages : async () => harness.fetched || [],
     },
     state: {
       lastId: () => store.lastId,
@@ -44,6 +59,7 @@ function harness({ forwardFails = false, sendFails = false, keywordsFor } = {}) 
     peerKeyOf: () => KEY,
     eventKeyOf: () => KEY,
     albumWindowMs: 10,
+    ...extra,
   });
   return { forwarder, sent, alerts, logs, store };
 }
@@ -111,13 +127,80 @@ test('когда не вышло ни то ни другое — громкая 
   assert.strictEqual(h.store.sentIds.length, 0, 'неотправленное не помечается отправленным');
 });
 
-test('догрузка предупреждает, когда упёрлась в потолок', async () => {
-  const h = harness();
+function quiet(from, to) {
+  return Array.from({ length: to - from + 1 }, (_, i) => msg(from + i, 'ничего интересного'));
+}
+
+test('догрузка проходит все пропущенные, а не последние полсотни', async () => {
+  const history = channelHistory([...quiet(101, 104), msg(105, 'продам телевизор'), ...quiet(106, 220)]);
+  const h = harness({ history, extra: { pageSize: 50 } });
   h.store.lastId = 100;
-  harness.fetched = Array.from({ length: 3 }, (_, i) => msg(101 + i, 'ничего интересного'));
-  await h.forwarder.backfill(SOURCE, { limit: 3 });
-  assert.match(h.logs.join(' '), /больше 3/);
-  harness.fetched = [];
+  await h.forwarder.backfill(SOURCE);
+  assert.deepStrictEqual(h.sent, [{ kind: 'forward', ids: [105] }]);
+  assert.strictEqual(h.store.lastId, 220);
+  assert.strictEqual(h.alerts.length, 0);
+});
+
+test('догрузка, упёршаяся в потолок, говорит о потере вслух', async () => {
+  const history = channelHistory([msg(101, 'продам телевизор'), ...quiet(102, 220)]);
+  const h = harness({ history, extra: { pageSize: 50, catchUpCap: 100 } });
+  h.store.lastId = 100;
+  await h.forwarder.backfill(SOURCE);
+  assert.deepStrictEqual(h.sent, []);
+  assert.match(h.logs.join(' '), /больше 100/);
+  assert.match(h.alerts.join(' '), /пропущен/);
+  assert.strictEqual(h.store.lastId, 220);
+});
+
+test('живое сообщение после слепого окна сначала проверяет пропущенное', async () => {
+  const history = channelHistory([msg(101, 'продам телевизор'), ...quiet(102, 102), msg(103, 'привет')]);
+  const h = harness({ history });
+  h.store.lastId = 100;
+  await h.forwarder.onMessage({ message: msg(103, 'привет') });
+  assert.deepStrictEqual(h.sent, [{ kind: 'forward', ids: [101] }]);
+  assert.strictEqual(h.store.lastId, 103);
+});
+
+test('сообщение сразу за позицией лишних запросов не делает', async () => {
+  const history = channelHistory([msg(101, 'продам телевизор')]);
+  const h = harness({ history });
+  h.store.lastId = 100;
+  await h.forwarder.onMessage({ message: msg(101, 'продам телевизор') });
+  assert.strictEqual(history.calls.length, 0);
+  assert.deepStrictEqual(h.sent, [{ kind: 'forward', ids: [101] }]);
+});
+
+test('сорванная проверка пропуска не сдвигает позицию за него', async () => {
+  const history = channelHistory([], { fails: true });
+  const h = harness({ history });
+  h.store.lastId = 100;
+  await h.forwarder.onMessage({ message: msg(110, 'продам телевизор') });
+  assert.deepStrictEqual(h.sent, [{ kind: 'forward', ids: [110] }]);
+  assert.strictEqual(h.store.lastId, 100);
+  assert.match(h.logs.join(' '), /не двигаю/);
+});
+
+test('два живых сообщения после пропуска не пересылают находку дважды', async () => {
+  const history = channelHistory([msg(101, 'продам телевизор'), msg(102, 'а'), msg(103, 'б')]);
+  const h = harness({ history });
+  h.store.lastId = 100;
+  await Promise.all([
+    h.forwarder.onMessage({ message: msg(102, 'а') }),
+    h.forwarder.onMessage({ message: msg(103, 'б') }),
+  ]);
+  assert.deepStrictEqual(h.sent, [{ kind: 'forward', ids: [101] }]);
+  assert.strictEqual(h.store.lastId, 103);
+});
+
+test('альбом после слепого окна тоже сначала проверяет пропущенное', async () => {
+  const history = channelHistory([msg(101, 'продам телевизор'), msg(105, 'фото', { groupedId: 9 }), msg(106, '', { groupedId: 9 })]);
+  const h = harness({ history });
+  h.store.lastId = 100;
+  await h.forwarder.onMessage({ message: msg(105, 'фото', { groupedId: 9 }) });
+  await h.forwarder.onMessage({ message: msg(106, '', { groupedId: 9 }) });
+  await new Promise((done) => setTimeout(done, 40));
+  assert.deepStrictEqual(h.sent, [{ kind: 'forward', ids: [101] }]);
+  assert.strictEqual(h.store.lastId, 106);
 });
 
 function probeHarness(newest, known) {
