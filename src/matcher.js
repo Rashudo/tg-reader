@@ -25,14 +25,15 @@ function groupNames(keywords) {
   return keywords.filter((entry) => entry && typeof entry.group === 'string').map((entry) => entry.group);
 }
 
-function prepareWord(entry, group) {
+function prepareWord(entry, group, except = []) {
+  const excluded = (text) => except.some((phrase) => text.includes(phrase));
   if (typeof entry === 'string') {
     const needle = normalize(entry);
-    return needle ? { raw: entry, group, test: (text) => text.includes(needle) } : null;
+    return needle ? { raw: entry, group, test: (text) => text.includes(needle) && !excluded(text) } : null;
   }
   if (entry && typeof entry.word === 'string' && entry.word.trim()) {
     const re = wholeWordRegExp(normalize(entry.word.trim()));
-    return { raw: entry.word, group, test: (text) => re.test(text) };
+    return { raw: entry.word, group, test: (text) => re.test(text) && !excluded(text) };
   }
   console.warn('keywords.js: пропущен непонятный элемент', entry);
   return null;
@@ -50,8 +51,9 @@ function prepare(keywords, disabledGroups = []) {
       continue;
     }
     if (disabledGroups.some((name) => sameName(name, entry.group))) continue;
+    const except = (entry.except || []).map(normalize).filter(Boolean);
     for (const word of entry.words || []) {
-      const ready = prepareWord(word, entry.group);
+      const ready = prepareWord(word, entry.group, except);
       if (ready) prepared.push(ready);
     }
   }

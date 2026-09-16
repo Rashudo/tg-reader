@@ -32,7 +32,7 @@ test('компьютерная клавиатура за клавишные не
 });
 
 test('слова разложены по группам, которые можно снять целиком', () => {
-  assert.deepStrictEqual(groupNames(keywords), ['Телевизоры', 'Телефоны', 'Саундбары', 'Колонки', 'Часы', 'Электросамокаты', 'Клавишные']);
+  assert.deepStrictEqual(groupNames(keywords), ['Телевизоры', 'Телефоны', 'Саундбары', 'Колонки', 'Часы', 'Электросамокаты', 'Велосипеды', 'Клавишные']);
 
   const безКлавишных = prepare(keywords, ['Клавишные']);
   assert.deepStrictEqual(findMatches('Продам синтезатор', безКлавишных), []);
@@ -193,4 +193,41 @@ test('обычные и детские самокаты за электроса�
 test('группу электросамокатов можно снять целиком', () => {
   const безСамокатов = prepare(keywords, ['Электросамокаты']);
   assert.deepStrictEqual(findMatches('Продам электросамокат', безСамокатов), []);
+});
+
+test('велосипеды ловятся во всех обычных формулировках', () => {
+  const ads = [
+    'Продам велосипед MERIDA MATTS 26", рама 46 см',
+    'Продаю городские Велосипеды 28", 26" все по 150 евро',
+    'Детский велосипед, колеса 20, на рост до 130',
+    'Продам электро-велосипед Bergamont E-Helix',
+    'Электровелосипед, батарея 36V',
+    'Продаю велик, почти новый',
+    'Prodajem bicikl Capriolo, 26 inča',
+    'Dečiji bicikli, 2 komada',
+    'MTB Rockrider ST 520, size M',
+    'Gravel bike, carbon fork',
+    'Куплю детский велосипед для мальчика примерно на 120см',
+  ];
+  for (const ad of ads) assert.notDeepStrictEqual(hits(ad), [], `не поймано: ${ad}`);
+});
+
+test('велоаксессуары, велосипедки и «велики» по размеру за велосипед не считаются', () => {
+  assert.deepStrictEqual(hits('Камера велосипедная Кенда под 26 колеса. За шоколадку'), []);
+  assert.deepStrictEqual(hits('Костюм Bona Fide, новый комплект: топ и велосипедки'), []);
+  assert.deepStrictEqual(hits('Продам набор шестигранников, насос велосипедный и замок'), []);
+  assert.deepStrictEqual(hits('Продам велосумки/корзины Rhinowalk на руль'), []);
+  assert.deepStrictEqual(hits('Велокресло Bellelli B-One Clamp + шлем 52–56 см'), []);
+  assert.deepStrictEqual(hits('Ботинки надеты пару раз, так как оказались велики'), []);
+  assert.deepStrictEqual(hits('Biciklistička kaciga, veličina M'), []);
+});
+
+test('группу велосипедов можно снять целиком', () => {
+  const безВелосипедов = prepare(keywords, ['Велосипеды']);
+  assert.deepStrictEqual(findMatches('Продам велосипед', безВелосипедов), []);
+});
+
+test('приветствие новичкам барахолки за объявление о велосипеде не считается', () => {
+  const welcome = 'Просим обратить внимание, что для рекламы выделен 1 рекламный день в неделю! РЕКЛАМА ПЛАТНАЯ (велосипеды тоже)!';
+  assert.deepStrictEqual(hits(welcome), []);
 });

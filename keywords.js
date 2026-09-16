@@ -98,6 +98,18 @@ module.exports = [
     ],
   },
   {
+    group: 'Велосипеды',
+    words: [
+      { word: 'велосипед' }, { word: 'велосипеда' }, { word: 'велосипеды' }, { word: 'велосипедов' },
+      { word: 'велосипедом' }, { word: 'велосипеде' }, { word: 'велосипеду' }, { word: 'велик' },
+      'электровелосипед',
+      { word: 'bicikl' }, { word: 'bicikla' }, { word: 'bicikli' }, { word: 'biciklove' },
+      { word: 'bicycle' }, { word: 'bike' }, { word: 'mtb' },
+      'capriolo', 'merida', 'btwin', 'rockrider', 'cannondale',
+    ],
+    except: ['велосипеды тоже'],
+  },
+  {
     group: 'Клавишные',
     words: [
       'пианино',

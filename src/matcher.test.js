@@ -142,3 +142,17 @@ test('для плоского списка сводка без групп', () =
   const flat = ['телевизор', { word: 'lg' }];
   assert.strictEqual(summary(flat, prepare(flat)), 'Ключевых слов: 2');
 });
+
+test('фраза-исключение гасит только свою группу', () => {
+  const prepared = prepare([
+    { group: 'Велосипеды', words: [{ word: 'велосипеды' }], except: ['велосипеды тоже'] },
+    { group: 'Реклама', words: ['реклама'] },
+  ]);
+  assert.deepStrictEqual(findMatches('РЕКЛАМА ПЛАТНАЯ (Велосипеды тоже)!', prepared), ['реклама']);
+  assert.deepStrictEqual(findMatches('Продаю велосипеды, два штуки', prepared), ['велосипеды']);
+});
+
+test('группа без исключений работает как раньше', () => {
+  const prepared = prepare([{ group: 'Телефоны', words: ['samsung'] }]);
+  assert.deepStrictEqual(findMatches('Samsung S9', prepared), ['samsung']);
+});
