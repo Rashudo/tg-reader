@@ -44,14 +44,21 @@ function prepare(keywords, disabledGroups = []) {
     return keywords.map((entry) => prepareWord(entry, null)).filter(Boolean);
   }
 
+  const common = keywords
+    .filter((entry) => entry && typeof entry.group !== 'string' && Array.isArray(entry.except))
+    .flatMap((entry) => entry.except)
+    .map(normalize)
+    .filter(Boolean);
+
   const prepared = [];
   for (const entry of keywords) {
+    if (entry && typeof entry.group !== 'string' && Array.isArray(entry.except) && !entry.words) continue;
     if (!entry || typeof entry.group !== 'string') {
       console.warn('keywords.js: пропущена группа без имени', entry);
       continue;
     }
     if (disabledGroups.some((name) => sameName(name, entry.group))) continue;
-    const except = (entry.except || []).map(normalize).filter(Boolean);
+    const except = [...common, ...(entry.except || []).map(normalize).filter(Boolean)];
     for (const word of entry.words || []) {
       const ready = prepareWord(word, entry.group, except);
       if (ready) prepared.push(ready);

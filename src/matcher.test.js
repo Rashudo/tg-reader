@@ -156,3 +156,18 @@ test('группа без исключений работает как рань�
   const prepared = prepare([{ group: 'Телефоны', words: ['samsung'] }]);
   assert.deepStrictEqual(findMatches('Samsung S9', prepared), ['samsung']);
 });
+
+test('общая фраза-исключение гасит все группы', () => {
+  const prepared = prepare([
+    { except: ['добро пожаловать в группу'] },
+    { group: 'Велосипеды', words: [{ word: 'велосипеды' }] },
+    { group: 'Часы', words: [{ word: 'часы' }] },
+  ]);
+  assert.deepStrictEqual(findMatches('Sofi, добро пожаловать в группу Велосипеды! Часы работы админов', prepared), []);
+  assert.deepStrictEqual(findMatches('Продаю велосипеды и часы', prepared), ['велосипеды', 'часы']);
+});
+
+test('запись с одними исключениями группой не считается', () => {
+  const keywords = [{ except: ['x'] }, { group: 'Часы', words: ['часы'] }];
+  assert.deepStrictEqual(groupNames(keywords), ['Часы']);
+});
