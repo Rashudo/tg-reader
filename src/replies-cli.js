@@ -3,7 +3,7 @@ const { config } = require('./config');
 const { createReplier } = require('./replier');
 const { createResponder } = require('./responder');
 const { loadVoice } = require('./voice');
-const { createAnthropicCall } = require('./news');
+const { createModelCall } = require('./llm');
 
 const ME = process.env.REPLY_ME_ID || '6307473828';
 const TICK_MS = 25 * 60 * 1000;
@@ -73,7 +73,7 @@ function memoryState() {
     responder: createResponder({
       model: config.replies.model,
       effort: config.replies.effort,
-      createMessage: createAnthropicCall(config.anthropicKey),
+      createMessage: createModelCall(config),
       samples: voice.samples,
       maxChars: config.replies.maxChars,
       name: 'Стас',

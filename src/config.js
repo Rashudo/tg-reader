@@ -29,6 +29,10 @@ const config = {
     chatId: (process.env.ALERT_CHAT_ID || '').trim(),
   },
   anthropicKey: (process.env.ANTHROPIC_API_KEY || '').trim(),
+  openaiKey: (process.env.OPENAI_API_KEY || '').trim(),
+  llm: {
+    provider: (process.env.LLM_PROVIDER || 'anthropic').trim().toLowerCase(),
+  },
   news: {
     channels: listFromEnv(process.env.NEWS_CHANNELS),
     target: (process.env.NEWS_TARGET || process.env.TARGET || 'me').trim(),

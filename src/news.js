@@ -1,21 +1,17 @@
-const Anthropic = require('@anthropic-ai/sdk');
 const { config } = require('./config');
+const { createAnthropicCall, createModelCall, missingKey } = require('./llm');
 const { createSummarizer } = require('./summarizer');
 const { runDigest } = require('./digest');
 const { peerKey } = require('./peer');
 const { isDue } = require('./schedule');
 
-function createAnthropicCall(apiKey) {
-  const client = new Anthropic({ apiKey });
-  return (request) => client.messages.create(request);
-}
-
 function isConfigured() {
-  return Boolean(config.anthropicKey) && config.news.channels.length > 0;
+  return !missingKey(config) && config.news.channels.length > 0;
 }
 
 function whyNotConfigured() {
-  if (!config.anthropicKey) return 'не задан ANTHROPIC_API_KEY';
+  const why = missingKey(config);
+  if (why) return why;
   if (config.news.channels.length === 0) return 'не задан NEWS_CHANNELS';
   return null;
 }
@@ -38,7 +34,7 @@ function createNewsDigest({ client, sources, target, notify, log, createMessage 
   const summarizer = createSummarizer({
     model: config.news.model,
     effort: config.news.effort,
-    createMessage: createMessage || createAnthropicCall(config.anthropicKey),
+    createMessage: createMessage || createModelCall(config),
     maxItems: config.news.maxItems,
     log,
   });
@@ -75,6 +71,7 @@ function createNewsDigest({ client, sources, target, notify, log, createMessage 
 module.exports = {
   createNewsDigest,
   createAnthropicCall,
+  createModelCall,
   resolveNewsSources,
   isConfigured,
   whyNotConfigured,

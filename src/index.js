@@ -11,6 +11,7 @@ const { keywordsForRef, normalizeRef, unknownOnlyGroups, strayOnlyRefs } = requi
 const { loadMemes } = require('./memes');
 const { createMemeSender } = require('./meme-sender');
 const { createTyping } = require('./typing');
+const { createModelCall, missingKey } = require('./llm');
 const { chatReactionOf } = require('./reactions');
 const { createState } = require('./state');
 const { withTimeout } = require('./async');
@@ -224,8 +225,9 @@ async function startReplies() {
     log('Автоответы выключены: REPLY_CHAT не задан');
     return;
   }
-  if (!config.anthropicKey) {
-    log('Автоответы выключены: нет ANTHROPIC_API_KEY');
+  const noKey = missingKey(config);
+  if (noKey) {
+    log(`Автоответы выключены: ${noKey}`);
     return;
   }
   if (!config.replies.enabled) {
@@ -279,7 +281,7 @@ async function startReplies() {
     responder: createResponder({
       model: config.replies.model,
       effort: config.replies.effort,
-      createMessage: news.createAnthropicCall(config.anthropicKey),
+      createMessage: createModelCall(config),
       samples: voice.samples,
       maxChars: config.replies.maxChars,
       name: me.firstName || me.username || 'я',

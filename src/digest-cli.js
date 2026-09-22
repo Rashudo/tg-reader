@@ -1,4 +1,5 @@
 const fs = require('fs');
+const { createModelCall, missingKey } = require('./llm');
 const { config } = require('./config');
 const { createClient } = require('./client');
 const { createState } = require('./state');
@@ -23,8 +24,9 @@ async function fromFile(file) {
     ...(config.news.links && item.link ? { link: item.link } : {}),
   })).filter((item) => item.text.trim());
 
-  if (!config.anthropicKey) {
-    console.error('Не задан ANTHROPIC_API_KEY в .env');
+  const noKey = missingKey(config);
+  if (noKey) {
+    console.error(`Модель недоступна: ${noKey}`);
     process.exit(1);
   }
 
@@ -32,7 +34,7 @@ async function fromFile(file) {
   const summarizer = createSummarizer({
     model: config.news.model,
     effort: config.news.effort,
-    createMessage: news.createAnthropicCall(config.anthropicKey),
+    createMessage: createModelCall(config),
     maxItems: config.news.maxItems,
     log,
   });

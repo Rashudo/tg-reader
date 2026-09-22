@@ -5,7 +5,7 @@ const bigInt = require('big-integer');
 const { Api } = require('telegram');
 const { config } = require('../src/config');
 const { createClient } = require('../src/client');
-const { createAnthropicCall } = require('../src/news');
+const { createModelCall, missingKey } = require('../src/llm');
 const { describeImage, sniffImage, DEFAULT_MODEL } = require('../src/memes-vision');
 const { MEMES_PATH } = require('../src/memes');
 
@@ -103,8 +103,9 @@ async function fetchPhase() {
 }
 
 async function describePhase() {
-  if (!config.anthropicKey) {
-    console.error('Нет ANTHROPIC_API_KEY — описывать картинки нечем');
+  const noKey = missingKey(config);
+  if (noKey) {
+    console.error(`Описывать картинки нечем: ${noKey}`);
     process.exit(1);
   }
   const listing = path.join(CACHE, 'index.json');
@@ -113,8 +114,8 @@ async function describePhase() {
     process.exit(1);
   }
   const items = JSON.parse(fs.readFileSync(listing, 'utf8'));
-  const model = valueOf('--model', DEFAULT_MODEL);
-  const createMessage = createAnthropicCall(config.anthropicKey);
+  const model = valueOf('--model', process.env.MEMES_MODEL || (config.llm.provider === 'openai' ? 'gpt-5.4-mini' : DEFAULT_MODEL));
+  const createMessage = createModelCall(config);
   const limit = Number(valueOf('--limit', items.length)) || items.length;
   const described = [];
   let skipped = 0;

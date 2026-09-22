@@ -8,6 +8,18 @@ const PRICES = {
   'claude-opus-4-8': { input: 5, output: 25 },
   'claude-fable-5': { input: 10, output: 50 },
   'claude-fable-5-1': { input: 10, output: 50 },
+  'gpt-6-astra': { input: 10, output: 50 },
+  'gpt-5.6-sol': { input: 4, output: 20 },
+  'gpt-5.6-terra': { input: 2, output: 12 },
+  'gpt-5.6-luna': { input: 0.2, output: 1.2 },
+  'gpt-5.5': { input: 5, output: 30 },
+  'gpt-5.4': { input: 2.5, output: 15 },
+  'gpt-5.4-mini': { input: 0.75, output: 4.5 },
+  'gpt-5.4-nano': { input: 0.2, output: 1.25 },
+  'gpt-5-mini': { input: 0.25, output: 2 },
+  'gpt-4.1': { input: 2, output: 8 },
+  'gpt-4.1-mini': { input: 0.4, output: 1.6 },
+  'gpt-4o-mini': { input: 0.15, output: 0.6 },
 };
 
 const SCHEMA = {
