@@ -32,7 +32,7 @@ test('компьютерная клавиатура за клавишные не
 });
 
 test('слова разложены по группам, которые можно снять целиком', () => {
-  assert.deepStrictEqual(groupNames(keywords), ['Телевизоры', 'Телефоны', 'Саундбары', 'Колонки', 'Часы', 'Электросамокаты', 'Велосипеды', 'Клавишные']);
+  assert.deepStrictEqual(groupNames(keywords), ['Телевизоры', 'Телефоны', 'Саундбары', 'Колонки', 'Часы', 'Электросамокаты', 'Велосипеды', 'Аэрогрили', 'Пазлы', 'Клавишные']);
 
   const безКлавишных = prepare(keywords, ['Клавишные']);
   assert.deepStrictEqual(findMatches('Продам синтезатор', безКлавишных), []);
@@ -237,4 +237,41 @@ test('приветствия новичкам не приходят ни по о
   const flea = 'Валерия Пищикова, добро пожаловать в группу Б/У БАРАХОЛКА НОВИ САД. 👋🏻 Продам телефон Samsung? Читайте правила';
   assert.deepStrictEqual(hits(bikes), []);
   assert.deepStrictEqual(hits(flea), []);
+});
+
+test('аэрогрили ловятся во всех написаниях', () => {
+  const ads = [
+    'Продам аэрогриль Philips, состояние отличное',
+    'Аэрогриля почти не использовали, 4000 дин',
+    'Аэро-гриль на 5 литров',
+    'Аэрофритюрница Xiaomi, 3.5 л',
+    'Air fryer Cosori, 5.5L, like new',
+    'Airfryer, kao nov',
+    'Prodajem fritezu na vruć vazduh',
+  ];
+  for (const ad of ads) assert.notDeepStrictEqual(hits(ad), [], `не поймано: ${ad}`);
+});
+
+test('пазлы ловятся, включая списки детских игрушек', () => {
+  const ads = [
+    'Пазл, 2000 деталей 500 динар',
+    'Пазлы лимоны 1000 штук, 1000 дин',
+    'Новая коробка с пазлами 800 дин',
+    'Различные пазлы: динозавр, домашние питомцы, половинки животные',
+    'Puzzle 500 pieces, complete',
+    'Prodajem puzle za decu',
+    'Slagalica drvena, 100 delova',
+  ];
+  for (const ad of ads) assert.notDeepStrictEqual(hits(ad), [], `не поймано: ${ad}`);
+});
+
+test('мозаика и обычный гриль пазлами и аэрогрилями не считаются', () => {
+  assert.deepStrictEqual(hits('Мозаика для малышей, все детали на месте'), []);
+  assert.deepStrictEqual(hits('Гриль угольный, для дачи'), []);
+  assert.deepStrictEqual(hits('Электрогриль-барбекю, 2000 Вт'), []);
+});
+
+test('группы аэрогрилей и пазлов снимаются целиком', () => {
+  const без = prepare(keywords, ['Аэрогрили', 'Пазлы']);
+  assert.deepStrictEqual(findMatches('Продам аэрогриль и пазлы', без), []);
 });
