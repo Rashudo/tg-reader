@@ -7,7 +7,12 @@ function fakeState() {
   let offset = 0;
   let posted = [];
   let memesOn = true;
+  let botId = null;
   return {
+    botId: () => botId,
+    setBotId: (id) => {
+      botId = id;
+    },
     repliesEnabled: () => enabled,
     setRepliesEnabled: (on) => {
       enabled = on;
@@ -304,4 +309,34 @@ test('прочая ошибка Bot API тоже попадает в журна�
   } });
   await bot.poll();
   assert.match(logs.join(' '), /Unauthorized/);
+});
+
+test('смена токена сбрасывает позицию чтения обновлений', async () => {
+  const state = fakeState();
+  state.setBotId('111');
+  state.setBotOffset(999999);
+  const logs = [];
+  const { bot } = rig([], { state, extra: { token: '222:secret', log: (line) => logs.push(line) } });
+  await bot.poll();
+  assert.strictEqual(state.botOffset(), 0);
+  assert.strictEqual(state.botId(), '222');
+  assert.match(logs.join(' '), /токен сменился/i);
+});
+
+test('тот же токен позицию не сбрасывает', async () => {
+  const state = fakeState();
+  state.setBotId('t');
+  state.setBotOffset(500);
+  const { bot } = rig([], { state });
+  await bot.poll();
+  assert.strictEqual(state.botOffset(), 500);
+});
+
+test('на первом запуске бот просто запоминается', async () => {
+  const state = fakeState();
+  state.setBotOffset(500);
+  const { bot } = rig([], { state });
+  await bot.poll();
+  assert.strictEqual(state.botOffset(), 500);
+  assert.strictEqual(state.botId(), 't');
 });

@@ -138,9 +138,23 @@ function createBotCommands({
     await say(await statusText());
   }
 
+  const botId = String(token || '').split(':')[0];
+
+  function forgetOldBot() {
+    if (!state.botId || !botId) return;
+    const known = state.botId();
+    if (known === botId) return;
+    if (known) {
+      log('Бот: токен сменился — начинаю читать обновления заново');
+      state.setBotOffset(0);
+    }
+    state.setBotId(botId);
+  }
+
   return {
     async poll() {
       if (!token || !chatId) return;
+      forgetOldBot();
       let response;
       try {
         response = await request(api('getUpdates'), {

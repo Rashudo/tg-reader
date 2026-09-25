@@ -88,6 +88,7 @@ function normalizeReplies(value) {
     said: [],
     posted: [],
     botOffset: 0,
+    botId: null,
     memes: { enabled: true, used: [] },
   };
   if (!value || typeof value !== 'object') return empty;
@@ -102,6 +103,7 @@ function normalizeReplies(value) {
     said: Array.isArray(value.said) ? value.said.filter((item) => typeof item === 'string') : [],
     posted: Array.isArray(value.posted) ? value.posted.map(normalizePosted).filter(Boolean) : [],
     botOffset: Number.isInteger(value.botOffset) ? value.botOffset : 0,
+    botId: typeof value.botId === 'string' && value.botId ? value.botId : null,
     memes: normalizeMemes(value.memes),
   };
 }
@@ -220,6 +222,13 @@ function createState(file = STATE_PATH) {
     },
     setRepliesEnabled(on) {
       replies = { ...replies, enabled: Boolean(on) };
+      schedule();
+    },
+    botId() {
+      return replies.botId;
+    },
+    setBotId(id) {
+      replies = { ...replies, botId: typeof id === 'string' && id ? id : null };
       schedule();
     },
     memesEnabled() {

@@ -402,3 +402,15 @@ test('повторная отправка картинки обновляет о
   state.noteMemeSent('m1', 500);
   assert.deepStrictEqual(state.recentMemes(), [{ id: 'm1', at: 500 }]);
 });
+
+test('бот запоминается вместе с позицией чтения обновлений', () => {
+  const file = tmpFile();
+  const state = createState(file);
+  assert.strictEqual(state.botId(), null);
+  state.setBotId('360091404');
+  state.setBotOffset(42);
+  state.flush();
+  const again = createState(file);
+  assert.strictEqual(again.botId(), '360091404');
+  assert.strictEqual(again.botOffset(), 42);
+});
