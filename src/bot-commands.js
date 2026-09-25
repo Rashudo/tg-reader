@@ -4,6 +4,7 @@ const { verdictOf } = require('./reactions');
 const { cut } = require('./format');
 
 const POLL_TIMEOUT_SEC = 25;
+const CONFLICT_QUIET_MS = 30 * 60 * 1000;
 
 function httpsPostJson(url, body) {
   return new Promise((resolve, reject) => {
@@ -60,6 +61,18 @@ function createBotCommands({
 }) {
   const api = (method) => `https://api.telegram.org/bot${token}/${method}`;
   const mine = (chat) => chat && String(chat.id) === String(chatId);
+  let conflictLoggedAt = null;
+
+  function noteRefusal(response) {
+    const why = response.description || `код ${response.error_code || '?'}`;
+    if (response.error_code === 409 || /conflict/i.test(why)) {
+      if (conflictLoggedAt !== null && now() - conflictLoggedAt < CONFLICT_QUIET_MS) return;
+      conflictLoggedAt = now();
+      log(`Бот: этого бота опрашивает кто-то ещё (${why}) — команды, кнопки и оценки до сервиса не доходят. Нужен отдельный токен.`);
+      return;
+    }
+    log(`Бот: Telegram отказал (${why})`);
+  }
 
   async function say(text) {
     await request(api('sendMessage'), { chat_id: chatId, text, disable_web_page_preview: true });
@@ -137,6 +150,11 @@ function createBotCommands({
         });
       } catch (err) {
         log(`Бот: не удалось прочитать команды (${err.message})`);
+        return;
+      }
+
+      if (response && response.ok === false) {
+        noteRefusal(response);
         return;
       }
 

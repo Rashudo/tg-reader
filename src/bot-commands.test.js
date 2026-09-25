@@ -262,3 +262,46 @@ test('статус говорит и про картинки', async () => {
   const said = calls.find((call) => call.url.includes('sendMessage'));
   assert.match(said.body.text, /Картинки выключены/);
 });
+
+test('конфликт с другим опросчиком виден в журнале', async () => {
+  const logs = [];
+  const { bot } = rig([], { extra: {
+    log: (line) => logs.push(line),
+    request: async (url) => (url.includes('getUpdates')
+      ? { ok: false, error_code: 409, description: 'Conflict: terminated by other getUpdates request; make sure that only one bot instance is running' }
+      : { ok: true }),
+  } });
+  await bot.poll();
+  assert.match(logs.join(' '), /опрашивает кто-то ещё/i);
+});
+
+test('о конфликте не пишется в журнал на каждом опросе', async () => {
+  const logs = [];
+  let now = 0;
+  const { bot } = rig([], { extra: {
+    log: (line) => logs.push(line),
+    now: () => now,
+    request: async (url) => (url.includes('getUpdates')
+      ? { ok: false, error_code: 409, description: 'Conflict: terminated by other getUpdates request' }
+      : { ok: true }),
+  } });
+  await bot.poll();
+  now += 60 * 1000;
+  await bot.poll();
+  assert.strictEqual(logs.filter((line) => /опрашивает кто-то ещё/i.test(line)).length, 1);
+  now += 31 * 60 * 1000;
+  await bot.poll();
+  assert.strictEqual(logs.filter((line) => /опрашивает кто-то ещё/i.test(line)).length, 2);
+});
+
+test('прочая ошибка Bot API тоже попадает в журнал', async () => {
+  const logs = [];
+  const { bot } = rig([], { extra: {
+    log: (line) => logs.push(line),
+    request: async (url) => (url.includes('getUpdates')
+      ? { ok: false, error_code: 401, description: 'Unauthorized' }
+      : { ok: true }),
+  } });
+  await bot.poll();
+  assert.match(logs.join(' '), /Unauthorized/);
+});
