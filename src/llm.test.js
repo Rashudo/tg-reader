@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { missingKey, createModelCall, PROVIDERS } = require('./llm');
+const { missingKey, createModelCall, modelMismatch, PROVIDERS } = require('./llm');
 
 const base = { anthropicKey: 'sk-ant', openaiKey: 'sk-proj' };
 
@@ -28,4 +28,19 @@ test('опечатка в поставщике не выдаётся за отс
 test('для каждого поставщика создаётся вызов', () => {
   assert.strictEqual(typeof createModelCall({ ...base, llm: { provider: 'anthropic' } }), 'function');
   assert.strictEqual(typeof createModelCall({ ...base, llm: { provider: 'openai' } }), 'function');
+});
+
+test('поставщика можно задать отдельно от общего', () => {
+  const config = { ...base, llm: { provider: 'openai' } };
+  assert.strictEqual(typeof createModelCall(config, 'anthropic'), 'function');
+  assert.strictEqual(missingKey({ ...config, anthropicKey: '' }, 'anthropic'), 'не задан ANTHROPIC_API_KEY');
+  assert.strictEqual(missingKey(config, 'anthropic'), null);
+});
+
+test('модель не от того поставщика видна сразу', () => {
+  assert.match(modelMismatch('anthropic', 'gpt-6-astra'), /gpt-6-astra/);
+  assert.match(modelMismatch('openai', 'claude-fable-5-1'), /claude-fable-5-1/);
+  assert.strictEqual(modelMismatch('anthropic', 'claude-fable-5-1'), null);
+  assert.strictEqual(modelMismatch('openai', 'gpt-5.5'), null);
+  assert.strictEqual(modelMismatch('openai', 'o3-mini'), null);
 });

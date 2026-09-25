@@ -24,7 +24,7 @@ async function fromFile(file) {
     ...(config.news.links && item.link ? { link: item.link } : {}),
   })).filter((item) => item.text.trim());
 
-  const noKey = missingKey(config);
+  const noKey = missingKey(config, config.news.provider);
   if (noKey) {
     console.error(`Модель недоступна: ${noKey}`);
     process.exit(1);
@@ -34,7 +34,7 @@ async function fromFile(file) {
   const summarizer = createSummarizer({
     model: config.news.model,
     effort: config.news.effort,
-    createMessage: createModelCall(config),
+    createMessage: createModelCall(config, config.news.provider),
     maxItems: config.news.maxItems,
     log,
   });

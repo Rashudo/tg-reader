@@ -4,6 +4,9 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const { numFromEnv, hourOrOff, pauseMsFrom, listFromEnv, listOr } = require('./env');
 const { parseChannelOnly } = require('./channel-only');
 
+const PROVIDER = (process.env.LLM_PROVIDER || 'anthropic').trim().toLowerCase();
+const providerOr = (raw) => (raw || '').trim().toLowerCase() || PROVIDER;
+
 function required(name) {
   const value = (process.env[name] || '').trim();
   if (!value) {
@@ -31,11 +34,12 @@ const config = {
   anthropicKey: (process.env.ANTHROPIC_API_KEY || '').trim(),
   openaiKey: (process.env.OPENAI_API_KEY || '').trim(),
   llm: {
-    provider: (process.env.LLM_PROVIDER || 'anthropic').trim().toLowerCase(),
+    provider: PROVIDER,
   },
   news: {
     channels: listFromEnv(process.env.NEWS_CHANNELS),
     target: (process.env.NEWS_TARGET || process.env.TARGET || 'me').trim(),
+    provider: providerOr(process.env.NEWS_PROVIDER),
     model: (process.env.NEWS_MODEL || 'claude-fable-5-1').trim(),
     effort: (process.env.NEWS_EFFORT || 'low').trim(),
     hour: numFromEnv(process.env.NEWS_HOUR, 7),
@@ -47,6 +51,7 @@ const config = {
   replies: {
     chat: (process.env.REPLY_CHAT || '').trim(),
     enabled: (process.env.REPLY_ENABLED || 'on').trim().toLowerCase() !== 'off',
+    provider: providerOr(process.env.REPLY_PROVIDER),
     model: (process.env.REPLY_MODEL || 'claude-fable-5-1').trim(),
     effort: (process.env.REPLY_EFFORT || 'low').trim(),
     typing: (process.env.REPLY_TYPING || 'on').trim().toLowerCase() !== 'off',

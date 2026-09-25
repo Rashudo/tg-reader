@@ -530,10 +530,22 @@ npm run replies -- --from-file выгрузка.json
 
 ### Чья модель
 
-Сводку, ответы в чате и описание картинок пишет модель одного поставщика:
-`LLM_PROVIDER=anthropic` (Claude, ключ `ANTHROPIC_API_KEY`) или
-`LLM_PROVIDER=openai` (ChatGPT, ключ `OPENAI_API_KEY`). Модели в `REPLY_MODEL` и
-`NEWS_MODEL` должны быть этого же поставщика — `claude-...` или `gpt-...`.
+`LLM_PROVIDER` задаёт поставщика по умолчанию: `anthropic` (Claude, ключ
+`ANTHROPIC_API_KEY`) или `openai` (ChatGPT, ключ `OPENAI_API_KEY`). Ответы в чате
+и сводку можно развести: `REPLY_PROVIDER` и `NEWS_PROVIDER` перебивают общую
+настройку для своей задачи. Например ответы на Claude, а сводка на ChatGPT:
+
+```
+LLM_PROVIDER=openai
+NEWS_MODEL=gpt-5.6-terra
+REPLY_PROVIDER=anthropic
+REPLY_MODEL=claude-fable-5-1
+```
+
+Модель должна быть того же поставщика, что и выбран для задачи. Если названия
+перепутаны, сервис говорит об этом в журнале при старте — строкой
+`модель … не похожа на модель Anthropic` (или OpenAI), не дожидаясь первого
+платного вызова.
 
 Остальной код от поставщика не зависит: запрос собирается в формате Anthropic,
 а для OpenAI его переводит `src/openai.js` — туда и обратно, включая картинки,

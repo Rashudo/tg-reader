@@ -11,7 +11,7 @@ const { keywordsForRef, normalizeRef, unknownOnlyGroups, strayOnlyRefs } = requi
 const { loadMemes } = require('./memes');
 const { createMemeSender } = require('./meme-sender');
 const { createTyping } = require('./typing');
-const { createModelCall, missingKey } = require('./llm');
+const { createModelCall, missingKey, modelMismatch } = require('./llm');
 const { chatReactionOf } = require('./reactions');
 const { createState } = require('./state');
 const { withTimeout } = require('./async');
@@ -225,11 +225,13 @@ async function startReplies() {
     log('Автоответы выключены: REPLY_CHAT не задан');
     return;
   }
-  const noKey = missingKey(config);
+  const noKey = missingKey(config, config.replies.provider);
   if (noKey) {
     log(`Автоответы выключены: ${noKey}`);
     return;
   }
+  const mismatch = modelMismatch(config.replies.provider, config.replies.model);
+  if (mismatch) log(`Ответчик: ${mismatch}`);
   if (!config.replies.enabled) {
     log('Автоответы выключены: REPLY_ENABLED=off');
     return;
@@ -281,7 +283,7 @@ async function startReplies() {
     responder: createResponder({
       model: config.replies.model,
       effort: config.replies.effort,
-      createMessage: createModelCall(config),
+      createMessage: createModelCall(config, config.replies.provider),
       samples: voice.samples,
       maxChars: config.replies.maxChars,
       name: me.firstName || me.username || 'я',

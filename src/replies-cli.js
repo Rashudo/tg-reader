@@ -73,7 +73,7 @@ function memoryState() {
     responder: createResponder({
       model: config.replies.model,
       effort: config.replies.effort,
-      createMessage: createModelCall(config),
+      createMessage: createModelCall(config, config.replies.provider),
       samples: voice.samples,
       maxChars: config.replies.maxChars,
       name: 'Стас',
